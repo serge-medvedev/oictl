@@ -1,0 +1,337 @@
+# Reconciled at 40bfb776b0fb80802e3af5db5608b1ed58af711f (runtime cad8b3e9).
+# path|kind (A action, G group, B both)|representative operands|local flags|baseline long|baseline short
+# Baseline classifications are evidence labels, not acceptance expectations.
+# Option aliases: url/base-url; data-file/file (bodies); dir/directory; q/query; startIndex/start-index; confirm/yes.
+# Command aliases: root help/--help/-h, version/--version/-v; provider config set/update.
+# Dynamic operands: API method/path/full URL, provider request path, knowledge sync action, resource/profile names.
+# Existing positional help: root/family and tools/functions valves. Leaf help operands remain data.
+# globals: profile base-url url token output timeout out
+# booleans: save yes dry-run confirm stream include-valves allow-sensitive-ui-keys show-url verify-url external all all-users allow-ui-settings-extension
+|G|||help|help
+--help|A|||help|help
+--version|A|||version|version
+-h|A|||help|help
+-v|A|||version|version
+analytics|G|||help|help
+analytics daily|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
+analytics messages|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
+analytics models|B||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|non-help-error
+analytics models chats|A|example-1|start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
+analytics models overview|A|example-1|start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
+analytics summary|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
+analytics tokens|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
+analytics users|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
+api|A|/example|data file data-file method header api-key-header|help|help
+auth|G|||help|help
+auth admin-config|G|||requires-value|non-help-error
+auth admin-config get|A|||requires-value|non-help-error
+auth admin-config set|A||data file data-file|help|help
+auth api-key|G|||requires-value|non-help-error
+auth api-key create|A|||requires-value|non-help-error
+auth api-key delete|A|||requires-value|non-help-error
+auth api-key get|A|||requires-value|non-help-error
+auth ldap-config|G|||requires-value|non-help-error
+auth ldap-config get|A|||requires-value|non-help-error
+auth ldap-config set|A||data file data-file|help|help
+auth ldap-server-config|G|||requires-value|non-help-error
+auth ldap-server-config get|A|||requires-value|non-help-error
+auth ldap-server-config set|A||data file data-file|help|help
+auth login|A||data file data-file save|help|help
+auth logout|A|||requires-value|http-execution
+auth me|A|||requires-value|http-execution
+auth oauth-config|G|||requires-value|non-help-error
+auth oauth-config get|A|||requires-value|non-help-error
+auth oauth-config set|A||data file data-file|help|help
+auth password|G|||requires-value|non-help-error
+auth password update|A||data file data-file|help|help
+auth profile|G|||requires-value|non-help-error
+auth profile update|A||data file data-file|help|help
+auth timezone|G|||requires-value|non-help-error
+auth timezone set|A|UTC||requires-value|http-execution
+automations|G|||help|help
+automations create|A||data file data-file|help|help
+automations delete|A|example-1|yes confirm|requires-value|non-help-error
+automations get|A|example-1||requires-value|http-execution
+automations list|A||page status limit skip|requires-value|http-execution
+automations run|A|example-1||requires-value|http-execution
+automations runs|G|||requires-value|non-help-error
+automations runs list|A|example-1|limit skip|requires-value|http-execution
+automations toggle|A|example-1||requires-value|http-execution
+automations update|A|example-1|data file data-file|help|help
+channels|G|||help|help
+channels create|A||data file data-file|help|help
+channels delete|A|example-1|yes confirm|requires-value|non-help-error
+channels get|A|example-1||requires-value|http-execution
+channels list|A|||requires-value|non-help-error
+channels members|G|||requires-value|non-help-error
+channels members active|A|example-1|data file data-file|help|help
+channels members add|A|example-1|data file data-file|help|help
+channels members list|A|example-1|query q page order-by direction|requires-value|http-execution
+channels members remove|A|example-1|data file data-file|help|help
+channels messages|G|||requires-value|non-help-error
+channels messages data|A|example-1 example-2||requires-value|non-help-error
+channels messages delete|A|example-1 example-2|yes confirm|requires-value|non-help-error
+channels messages get|A|example-1 example-2||requires-value|non-help-error
+channels messages list|A|example-1|skip limit|requires-value|http-execution
+channels messages post|A|example-1|data file data-file|help|help
+channels messages thread|A|example-1 example-2|skip limit|requires-value|non-help-error
+channels messages update|A|example-1 example-2|data file data-file|help|help
+channels pins|G|||requires-value|non-help-error
+channels pins list|A|example-1|page|requires-value|http-execution
+channels pins set|A|example-1 example-2||requires-value|non-help-error
+channels pins unset|A|example-1 example-2||requires-value|non-help-error
+channels reactions|G|||requires-value|non-help-error
+channels reactions add|A|example-1 example-2|data file data-file name|help|help
+channels reactions remove|A|example-1 example-2|data file data-file name|help|help
+channels update|A|example-1|data file data-file|help|help
+chats|G|||help|help
+chats archive|A|example-1||requires-value|http-execution
+chats compact|A|example-1|data file data-file model|help|help
+chats delete|A|example-1|yes confirm|requires-value|non-help-error
+chats export|A||chat-id all-users|requires-value|http-execution
+chats get|A|example-1||requires-value|http-execution
+chats import|A||data file data-file|help|help
+chats list|A||user-id archived folder-id page limit skip|requires-value|http-execution
+chats pin|A|example-1||requires-value|http-execution
+chats search|A||query q page limit|requires-value|http-execution
+chats share|A|example-1||requires-value|http-execution
+chats tags|G|||requires-value|non-help-error
+chats tags delete|A|example-1|data file data-file tag|help|help
+chats tags get|A|example-1||requires-value|http-execution
+chats tags set|A|example-1|data file data-file tag|help|help
+config|G|||help|help
+config banners|G|||requires-value|non-help-error
+config banners get|A|||requires-value|non-help-error
+config banners set|A||data file data-file|help|help
+config code-execution|G|||requires-value|non-help-error
+config code-execution get|A|||requires-value|non-help-error
+config code-execution set|A||data file data-file|help|help
+config connections|G|||requires-value|non-help-error
+config connections get|A|||requires-value|non-help-error
+config connections set|A||data file data-file|help|help
+config export|A|||requires-value|http-execution
+config import|A||data file data-file|help|help
+config models|G|||requires-value|non-help-error
+config models defaults|A|||requires-value|non-help-error
+config models get|A|||requires-value|non-help-error
+config models set|A||data file data-file|help|help
+config namespace|A|example-1||requires-value|http-execution
+config oauth-client|G|||requires-value|non-help-error
+config oauth-client register|A||data file data-file type|help|help
+config suggestions|A||data file data-file|help|help
+config terminal-servers|G|||requires-value|non-help-error
+config terminal-servers access-grants|G|||requires-value|non-help-error
+config terminal-servers access-grants diff|A|example-1|data file data-file|help|help
+config terminal-servers access-grants get|A|example-1||requires-value|http-execution
+config terminal-servers access-grants set|A|example-1|data file data-file|help|help
+config terminal-servers get|A|||requires-value|non-help-error
+config terminal-servers lifecycle|A||data file data-file|help|help
+config terminal-servers policy|A||data file data-file|help|help
+config terminal-servers refresh|A||data file data-file|help|help
+config terminal-servers set|A||data file data-file|help|help
+config terminal-servers verify|A||data file data-file|help|help
+config tool-servers|G|||requires-value|non-help-error
+config tool-servers get|A|||requires-value|non-help-error
+config tool-servers set|A||data file data-file|help|help
+config tool-servers verify|A||data file data-file|help|help
+files|G|||help|help
+files content|A|example-1||requires-value|http-execution
+files count|A|||requires-value|http-execution
+files data-content|A|example-1||requires-value|http-execution
+files delete|A|example-1||requires-value|http-execution
+files delete-all|A|||requires-value|http-execution
+files get|A|example-1||requires-value|http-execution
+files html-content|A|example-1||requires-value|http-execution
+files list|A||content page|requires-value|http-execution
+files named-content|A|example-1 example-2||requires-value|non-help-error
+files rename|A|example-1|name|requires-value|non-help-error
+files search|A||filename query skip limit content|requires-value|http-execution
+files status|A|example-1||requires-value|http-execution
+files update-content|A|example-1|data file data-file|help|help
+files upload|A|discovery-upload.txt|metadata process process-in-background|help|help
+functions|G|||help|help
+functions create|A||data file data-file|help|help
+functions delete|A|example-1|yes confirm|requires-value|non-help-error
+functions export|A||include-valves|requires-value|http-execution
+functions get|A|example-1||requires-value|http-execution
+functions list|A||type|requires-value|http-execution
+functions load-url|A|https://example.invalid/function.py||requires-value|http-execution
+functions sync|A||data file data-file yes confirm|help|help
+functions toggle|A|example-1||requires-value|http-execution
+functions toggle-global|A|example-1||requires-value|http-execution
+functions update|A|example-1|data file data-file|help|help
+functions valves|G|||help|help
+functions valves get|A|example-1||help|help
+functions valves spec|A|example-1||help|help
+functions valves update|A|example-1|data file data-file|help|help
+functions valves user|G|||help|help
+functions valves user get|A|example-1||help|help
+functions valves user spec|A|example-1||help|help
+functions valves user update|A|example-1|data file data-file|help|help
+groups|G|||help|help
+groups create|A||data file data-file|help|help
+groups delete|A|example-1|yes confirm|requires-value|non-help-error
+groups export|A|example-1||requires-value|http-execution
+groups get|A|example-1||requires-value|http-execution
+groups info|A|example-1||requires-value|http-execution
+groups list|A||share|requires-value|http-execution
+groups preview|A|example-1||requires-value|http-execution
+groups update|A|example-1|data file data-file|help|help
+groups users|G|||requires-value|non-help-error
+groups users add|A|example-1 example-2|data file data-file|help|help
+groups users list|A|example-1||requires-value|http-execution
+groups users remove|A|example-1 example-2|data file data-file|help|help
+help|A|||help|help
+knowledge|G|||help|help
+knowledge access-update|A|example-1|data file data-file|help|help
+knowledge create|A||data file data-file|help|help
+knowledge delete|A|example-1|data file data-file|help|help
+knowledge dirs|G|||requires-value|non-help-error
+knowledge dirs create|A|example-1|data file data-file|help|help
+knowledge dirs delete|A|example-1 example-2|data file data-file|help|help
+knowledge dirs update|A|example-1 example-2|data file data-file|help|help
+knowledge export|A|example-1|data file data-file|help|help
+knowledge files|G|||requires-value|non-help-error
+knowledge files add|A|example-1 example-2||requires-value|non-help-error
+knowledge files batch-add|A|example-1|data file data-file|help|help
+knowledge files list|A|example-1|page query q include-content view-option order-by direction directory-id limit|requires-value|http-execution
+knowledge files move|A|example-1|data file data-file|help|help
+knowledge files pending|A|example-1||requires-value|http-execution
+knowledge files remove|A|example-1|data file data-file|help|help
+knowledge files update|A|example-1|data file data-file|help|help
+knowledge get|A|example-1|data file data-file|help|help
+knowledge list|A||page|requires-value|http-execution
+knowledge metadata-reindex|A||data file data-file|help|help
+knowledge reindex|A||data file data-file|help|help
+knowledge reset|A|example-1|data file data-file|help|help
+knowledge search|A||query view-option source page|requires-value|http-execution
+knowledge search-files|A||query include-content page|requires-value|http-execution
+knowledge sync|G||data file data-file|requires-value|non-help-error
+knowledge sync cleanup|A|example-1|data file data-file|help|help
+knowledge sync diff|A|example-1|data file data-file|help|help
+knowledge update|A|example-1|data file data-file|help|help
+manifests|G|||help|help
+manifests apply|A||file directory dir dry-run|help|help
+manifests diff|A||file directory dir|help|help
+manifests sync|A||file directory dir scope dry-run yes confirm|help|help
+models|G|||help|help
+models access-update|A|example-1|data file data-file|help|help
+models base|A||tag|requires-value|http-execution
+models base-tags|A|||requires-value|http-execution
+models create|A||data file data-file|help|help
+models delete|A|example-1|data file data-file|help|help
+models delete-all|A|||requires-value|http-execution
+models export|A|||requires-value|http-execution
+models get|A|example-1||requires-value|http-execution
+models import|A||data file data-file|help|help
+models list|A||query view-option tag order-by direction page|requires-value|http-execution
+models sync|A||data file data-file yes confirm|help|help
+models tags|A|||requires-value|http-execution
+models toggle|A|example-1|data file data-file|help|help
+models update|A|example-1|data file data-file|help|help
+profiles|G|||help|help
+profiles delete|A|example-1||requires-value|local-side-effect
+profiles get|A|example-1||requires-value|non-help-success
+profiles set|A|example-1||requires-value|non-help-error
+providers|G|||help|help
+providers ollama|G|||requires-value|non-help-error
+providers ollama config|G|||requires-value|non-help-error
+providers ollama config get|A|||requires-value|non-help-error
+providers ollama config set|A||data file data-file|help|help
+providers ollama config update|A||data file data-file|help|help
+providers ollama models|A|||requires-value|http-execution
+providers ollama ps|A|||requires-value|http-execution
+providers ollama request|A|/example|data file data-file method header stream|help|help
+providers ollama tags|A|||requires-value|http-execution
+providers ollama verify|A||data file data-file|help|help
+providers ollama version|A|||requires-value|http-execution
+providers openai|G|||requires-value|non-help-error
+providers openai config|G|||requires-value|non-help-error
+providers openai config get|A|||requires-value|non-help-error
+providers openai config set|A||data file data-file|help|help
+providers openai config update|A||data file data-file|help|help
+providers openai models|A|||requires-value|http-execution
+providers openai request|A|/example|data file data-file method header stream|help|help
+providers openai verify|A||data file data-file|help|help
+scim|G||scim-token|help|help
+scim groups|G||scim-token|requires-value|non-help-error
+scim groups create|A||data file data-file scim-token|help|help
+scim groups delete|A|example-1|scim-token yes confirm|requires-value|non-help-error
+scim groups get|A|example-1|scim-token|requires-value|http-execution
+scim groups list|A||scim-token start-index startIndex count filter|requires-value|http-execution
+scim groups patch|A|example-1|data file data-file scim-token|help|help
+scim groups replace|A|example-1|data file data-file scim-token|help|help
+scim resource-types|A||scim-token|requires-value|http-execution
+scim schemas|A||scim-token|requires-value|http-execution
+scim service-provider-config|A||scim-token|requires-value|http-execution
+scim users|G||scim-token|requires-value|non-help-error
+scim users create|A||data file data-file scim-token|help|help
+scim users delete|A|example-1|scim-token yes confirm|requires-value|non-help-error
+scim users get|A|example-1|scim-token|requires-value|http-execution
+scim users list|A||scim-token start-index startIndex count filter|requires-value|http-execution
+scim users patch|A|example-1|data file data-file scim-token|help|help
+scim users replace|A|example-1|data file data-file scim-token|help|help
+skills|G|||help|help
+skills access-update|A|example-1|data file data-file|help|help
+skills create|A||data file data-file manifest|help|help
+skills delete|A|example-1|yes confirm|requires-value|non-help-error
+skills export|A|example-1|format|requires-value|http-execution
+skills get|A|example-1||requires-value|http-execution
+skills list|A||query view-option page|requires-value|http-execution
+skills toggle|A|example-1||requires-value|http-execution
+skills update|A|example-1|data file data-file manifest|help|help
+tasks|G|||help|help
+tasks config|G|||requires-value|non-help-error
+tasks config get|A|||requires-value|non-help-error
+tasks config set|A||data file data-file|help|help
+tasks skills|G|||requires-value|non-help-error
+tasks skills attach|A|example-1|external|requires-value|http-execution
+tools|G|||help|help
+tools access-update|A|example-1|data file data-file|help|help
+tools create|A||data file data-file|help|help
+tools delete|A|example-1||requires-value|http-execution
+tools export|A||manifest directory dir|requires-value|non-help-error
+tools get|A|example-1||requires-value|http-execution
+tools list|A|||requires-value|http-execution
+tools load-url|A||data file data-file|help|help
+tools update|A|example-1|data file data-file|help|help
+tools valves|G|||help|help
+tools valves get|A|example-1||help|help
+tools valves spec|A|example-1||help|help
+tools valves update|A|example-1|data file data-file|help|help
+tools valves user|G|||help|help
+tools valves user get|A|example-1||help|help
+tools valves user spec|A|example-1||help|help
+tools valves user update|A|example-1|data file data-file|help|help
+users|G|||help|help
+users create|A||data file data-file|help|help
+users delete|A|example-1|yes confirm|requires-value|non-help-error
+users get|A|example-1||requires-value|http-execution
+users list|A||query q page order-by direction|requires-value|non-help-error
+users search|A||query q page order-by direction|requires-value|non-help-error
+users settings|G|||requires-value|non-help-error
+users settings get|A|||requires-value|non-help-error
+users settings update|A||data file data-file allow-sensitive-ui-keys|help|help
+users ui-settings|G|||requires-value|non-help-error
+users ui-settings bulk-patch|A|example-1|data file data-file allow-sensitive-ui-keys allow-ui-settings-extension user-id users-file all query dry-run yes confirm|help|help
+users ui-settings patch|A|example-1|data file data-file allow-sensitive-ui-keys allow-ui-settings-extension|help|help
+users update|A|example-1|data file data-file|help|help
+version|A|||version|version
+webhooks|G|||help|help
+webhooks channels|G|||requires-value|non-help-error
+webhooks channels create|A|example-1|data file data-file name profile-image-url|help|help
+webhooks channels delete|A|example-1 example-2|yes confirm|requires-value|non-help-error
+webhooks channels ensure|A|example-1|data file data-file name profile-image-url show-url verify-url expected-url expected-url-env|help|help
+webhooks channels get|A|example-1 example-2||requires-value|non-help-error
+webhooks channels list|A|example-1||requires-value|http-execution
+webhooks channels update|A|example-1 example-2|data file data-file name profile-image-url|help|help
+webhooks channels url|A|example-1 example-2|show-url|requires-value|non-help-error
+webhooks events|G|||requires-value|non-help-error
+webhooks events catalog|A|||requires-value|non-help-error
+webhooks events create|A||data file data-file|help|help
+webhooks events delete|A|example-1|yes confirm|requires-value|non-help-error
+webhooks events disable|A|example-1||requires-value|http-execution
+webhooks events enable|A|example-1||requires-value|http-execution
+webhooks events get|A|example-1||requires-value|http-execution
+webhooks events list|A|||requires-value|non-help-error
+webhooks events update|A|example-1|data file data-file|help|help

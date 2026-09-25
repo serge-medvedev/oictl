@@ -213,7 +213,7 @@ func TestJSONHelpInventory(t *testing.T) {
 					if code != 0 {
 						t.Fatalf("%v: code=%d stderr=%s", args, code, errOut.String())
 					}
-					for _, text := range []string{"Usage:", "oictl " + key, "Input:", "Examples:", "Source:", want} {
+					for _, text := range []string{"Usage:", "oictl " + key, "Input:", "Examples:", want} {
 						if !strings.Contains(out.String(), text) {
 							t.Errorf("%v missing %q: %s", args, text, out.String())
 						}
@@ -225,7 +225,12 @@ func TestJSONHelpInventory(t *testing.T) {
 					if !ok {
 						t.Fatal("examples absent")
 					}
-					examples := strings.SplitN(section, "\nSource:", 2)[0]
+					if strings.Contains(out.String(), "\nSource:") {
+						t.Error("rendered help contains a source-provenance footer")
+					}
+					// Contextual help appends action/global options after the examples.
+					// Validate every example, but do not parse the following section as JSON.
+					examples, _, _ := strings.Cut(section, "\nOptions:\n")
 					count := 0
 					for _, example := range strings.Split(examples, "\n") {
 						example = strings.TrimSpace(example)

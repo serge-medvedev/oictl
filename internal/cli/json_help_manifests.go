@@ -56,7 +56,7 @@ const manifestInputHelp = `  One JSON object per file (YAML .yaml/.yml also acce
       metadata.name is the function ID; spec is its direct resource-defined
       valve-values object, not a {"valves":...} wrapper. Inspect separately with
       oictl functions valves spec <function-id>. Parent function must exist or be
-      created in the set. Null/default handling belongs to its Valves class.
+      created in the set. Null/default handling belongs to its valve schema.
       No access_grants and no sync pruning. Empty spec example is illustrative.
     Group:
       name:string (CLI creation fallback metadata.name), description:string
@@ -66,7 +66,7 @@ const manifestInputHelp = `  One JSON object per file (YAML .yaml/.yml also acce
       features.web_search:boolean; additional keys belong to server configuration.
       id may select existing identity but is never sent as a writable field.
       Update replaces name/description; omitted/null permissions/data are preserved
-      by the server. user_ids in inventory is not a writable GroupForm field;
+      by the server. user_ids in inventory is not a writable group field;
       membership uses groups users actions, not this manifest.
     Knowledge:
       name:string (CLI fallback metadata.name), description:string required by

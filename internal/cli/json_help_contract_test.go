@@ -27,8 +27,10 @@ func TestJSONHelpSourceContracts(t *testing.T) {
 		{"auth admin-config set", []string{`DEFAULT_USER_ROLE: "pending"|"user"|"admin"`, `CHANNEL_MODEL_RESPONSE_MODE: "thread"|"channel"`, `^(-1|0|(-?\d+(\.\d+)?)(ms|s|m|h|d|w))$`, "retains the existing setting", "CLI does not validate"}, ""},
 		{"tasks config set", []string{"Required nullable strings", "TASK_MODEL_PARAMS", "AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH"}, ""},
 		{"config tool-servers verify", []string{"required but nullable", "auth_type", "config"}, ""},
-		{"models sync", []string{"ModelModel", "user_id", "created_at", "updated_at"}, ""},
-		{"functions sync", []string{"FunctionWithValvesModel", "type", "is_global", "valves"}, ""},
+		// models/models.py ModelModel and models/functions.py FunctionWithValvesModel
+		// supply the full-record contracts, not their create-form subsets.
+		{"models sync", []string{"complete model records", "user_id", "created_at", "updated_at"}, ""},
+		{"functions sync", []string{"complete function records", "type", "is_global", "valves"}, ""},
 		{"knowledge files batch-add", []string{"JSON array", "file_id", "directory_id"}, ""},
 		{"automations create", []string{"rrule:string", "server_id:string", "cwd:string"}, ""},
 		{"scim users create", []string{"displayName:string", "emails:array", "familyName", "primary:boolean=true"}, ""},
@@ -141,7 +143,7 @@ func TestJSONHelpOptionBoundaries(t *testing.T) {
 		{[]string{"users", "create", "--profile", "--help"}, false},
 		{[]string{"users", "create", "--token", "-h"}, false},
 		{[]string{"users", "create", "--data", "--help", "-h"}, true},
-		{[]string{"skills", "create", "--manifest", "--help"}, true},
+		{[]string{"skills", "create", "--manifest", "--help"}, false},
 		{[]string{"skills", "create", "--manifest", "-h"}, false},
 		{[]string{"models", "sync", "--yes", "--help"}, true},
 		{[]string{"users", "ui-settings", "bulk-patch", "--all", "--help"}, true},

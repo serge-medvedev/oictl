@@ -51,7 +51,9 @@ func TestJSONHelpPublishedExamplesRealCLI(t *testing.T) {
 		if !ok {
 			t.Fatal("missing examples")
 		}
-		section, _, _ = strings.Cut(section, "\nSource:")
+		if strings.Contains(out, "\nSource:") {
+			t.Fatal("published help contains a source-provenance footer")
+		}
 		lines := strings.Split(strings.TrimSpace(section), "\n")
 		if idx >= len(lines) {
 			t.Fatal("missing example")

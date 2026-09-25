@@ -356,7 +356,7 @@ Event Commands:
   events delete <webhook-id> --yes                         Delete an event webhook
 
 Channel create requires a non-empty name, supplied by --name or JSON. Flag-based channel updates fetch current metadata and preserve omitted name/image fields; explicit JSON is a replacement form.
-JSON output is the complete server response and may include webhook tokens or destination URLs. Use default table output for redacted human-readable views. Use channels url or channels ensure URL options only when you intend to reveal, write, or verify the full incoming webhook URL.
+JSON output is the complete server response and may include webhook tokens or destination URLs. Table output redacts these values by default. The channels url and channels ensure URL options reveal, write, or verify the full incoming webhook URL.
 `)
 }
 
@@ -1033,8 +1033,8 @@ Commands:
   ui-settings patch  Patch another user's settings.ui map as an admin
   ui-settings bulk-patch  Patch settings.ui for multiple users sequentially
 
-Directory-derived non-dry-run bulk-patch operations require --yes or --confirm; use --dry-run to audit discovered targets first.
-Cross-user ui-settings commands require --allow-ui-settings-extension, including previews: the route is a deployment extension absent from the original API. Current-user settings use a different route and are never substituted.
+Directory-derived non-dry-run bulk-patch operations require --yes or --confirm; --dry-run previews discovered targets.
+Cross-user ui-settings commands require --allow-ui-settings-extension, including previews, and a deployment with the UI settings extension. Current-user settings are never substituted.
 Sensitive UI keys such as toolServers require --allow-sensitive-ui-keys.
 `)
 		return 0
@@ -1462,14 +1462,14 @@ Commands:
   update        Update a function from --data, --file, or --file - JSON
   delete        Delete a function; requires --yes
   export        Export functions to stdout or --out; --include-valves requests valve values
-  load-url      Ask Open WebUI to fetch Python source from a trusted URL
+  load-url      Ask Open WebUI to fetch Python source from a URL
   sync          Reconcile functions from JSON; requires --yes and can remove omitted remote functions
   toggle        Toggle a function active state
   toggle-global Toggle a function global state
   valves        Get, inspect, and update global or user-scoped valves
 
 Filters are managed as function records whose server-returned type is "filter"; no separate filters command is used.
-Function source is arbitrary Python loaded by Open WebUI. Only create, update, load, or sync code from trusted sources.
+Function source is arbitrary Python loaded by Open WebUI.
 Sync requires an explicit functions array or a bare-array shorthand; an empty array with --yes intentionally removes the remote inventory.
 
 Examples:

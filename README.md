@@ -32,8 +32,8 @@ oictl manifests apply --help
 ```
 
 The reference distinguishes CLI input from server defaults, replacement behavior,
-and resource-defined fields. Examples use the source contract identified in help;
-a deployment can expose different fields. Request-body sources are `--data JSON`,
+and resource-defined fields, with examples and no source-provenance footers.
+A deployment can expose different fields. Request-body sources are `--data JSON`,
 `--file PATH`, or `--data-file PATH`; either body-file option reads stdin for `-`.
 Manifest `--file -` instead names a literal file; its help covers the local envelope.
 

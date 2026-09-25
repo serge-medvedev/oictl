@@ -49,7 +49,7 @@ const terminalFieldsHelp = `  Connection object: required url:string. Optional n
   extensible object, default null. config.access_grants is an array of grants;
   other config keys belong to the terminal server. Defaults are server-owned.` + nativeGrantsHelp
 
-const optionalForwardedHelp = `  Optional forwarded JSON body. The identified upstream route defines
+const optionalForwardedHelp = `  Optional forwarded JSON body. This operation defines
   no request body and does not interpret JSON fields; no fields are required.
   The CLI still forwards a supplied body unchanged, including on GET/DELETE.
   Extensions may interpret it; their contract belongs to the selected endpoint.

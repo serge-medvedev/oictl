@@ -50,17 +50,23 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return 0
 	}
 
-	if a.printJSONInputHelp(args) {
-		return 0
+	if handled, code := a.printContextualHelp(ctx, args); handled {
+		return code
 	}
 
 	global, args, err := parseGlobalFlags(args)
 	if err != nil {
 		fmt.Fprintln(a.err, err)
+		a.printHelpHint(a.err, "")
 		return 1
 	}
 	if len(args) == 0 {
 		a.printHelp(a.out)
+		return 0
+	}
+
+	if args[0] == "version" || args[0] == "--version" || args[0] == "-v" {
+		fmt.Fprintf(a.out, "oictl %s\n", a.version)
 		return 0
 	}
 
@@ -74,6 +80,9 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	}
 	if err := validateCommandFlags(args); err != nil {
 		fmt.Fprintln(a.err, err)
+		pos, _ := jsonHelpPositionals(args)
+		path, _ := contextualHelpPath(pos)
+		a.printHelpHint(a.err, path)
 		return 1
 	}
 	switch args[0] {
@@ -310,7 +319,7 @@ func parseCommandFlags(args []string) (commandFlags, []string, error) {
 			if hasValue {
 				parsed, err := strconv.ParseBool(value)
 				if err != nil {
-					return commandFlags{}, nil, fmt.Errorf("--%s requires a boolean: %w", name, err)
+					return commandFlags{}, nil, fmt.Errorf("--%s requires a boolean", name)
 				}
 				flags.bools[name] = parsed
 			} else {
@@ -323,7 +332,7 @@ func parseCommandFlags(args []string) (commandFlags, []string, error) {
 				flags.bools[name] = value == "true"
 				continue
 			}
-			if !hasValue && (i+1 >= len(args) || strings.HasPrefix(args[i+1], "--")) {
+			if !hasValue && (i+1 >= len(args) || (strings.HasPrefix(args[i+1], "--") && args[i+1] != "--help")) {
 				flags.bools[name] = true
 				continue
 			}
@@ -353,7 +362,7 @@ func parseHeader(input string) (headerValue, error) {
 	name, value, ok := strings.Cut(input, ":")
 	name = strings.TrimSpace(name)
 	if !ok || name == "" {
-		return headerValue{}, fmt.Errorf("malformed header %q; expected name:value", input)
+		return headerValue{}, errors.New("malformed header; expected name:value")
 	}
 	return headerValue{name: name, value: strings.TrimSpace(value)}, nil
 }

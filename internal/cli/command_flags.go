@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -16,40 +15,64 @@ func validateCommandFlags(args []string) error {
 	if len(args) > 2 && (args[0] == "tools" || args[0] == "functions") && args[1] == "valves" && hasHelpFlag(args[2:]) {
 		return nil
 	}
-	flags, pos, err := parseCommandFlags(args)
-	if err != nil {
-		return err
-	}
-	allowed := ""
-	command := strings.Join(pos, " ")
-	for n := len(pos); n > 0; n-- {
-		if names, ok := commandFlagAllowlist[strings.Join(pos[:n], " ")]; ok {
-			allowed = names
-			command = strings.Join(pos[:n], " ")
-			break
+	pos, _ := jsonHelpPositionals(args)
+	allowed := allowedCommandFlags(pos)
+	command, _ := contextualHelpPath(pos)
+	set := map[string]bool{}
+	known := map[string]bool{}
+	for _, names := range commandFlagAllowlist {
+		for _, name := range strings.Fields(names) {
+			known[name] = true
 		}
 	}
-	set := map[string]bool{}
 	for _, name := range strings.Fields(allowed) {
 		set[name] = true
 	}
-	var supplied []string
-	for name := range flags.values {
-		supplied = append(supplied, name)
-	}
-	for name := range flags.bools {
-		supplied = append(supplied, name)
-	}
-	if len(flags.headers) > 0 {
-		supplied = append(supplied, "header")
-	}
-	sort.Strings(supplied)
-	for _, name := range supplied {
+	// Classify names before asking for values. The scanner skips supported
+	// scalar values verbatim, including strings that look like other flags.
+	for i := 0; i < len(args); i++ {
+		name, _, hasValue := splitFlag(args[i])
+		if name == "" {
+			continue
+		}
+		if !known[name] {
+			return fmt.Errorf("unknown option --%s", name)
+		}
 		if !set[name] {
 			return fmt.Errorf("--%s is not supported by %s", name, command)
 		}
+		if isBooleanCommandFlag(name) || hasValue {
+			continue
+		}
+		if name == "manifest" && command == "tools export" {
+			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "--") {
+				continue
+			}
+		}
+		if i+1 >= len(args) {
+			return fmt.Errorf("--%s requires a value", name)
+		}
+		i++
 	}
-	return nil
+	_, _, err := parseCommandFlags(args)
+	return err
+}
+
+func allowedCommandFlags(pos []string) string {
+	for n := len(pos); n > 0; n-- {
+		if names, ok := commandFlagAllowlist[strings.Join(pos[:n], " ")]; ok {
+			return names
+		}
+	}
+	return ""
+}
+
+func isBooleanCommandFlag(name string) bool {
+	switch name {
+	case "save", "yes", "dry-run", "confirm", "stream", "include-valves", "allow-sensitive-ui-keys", "show-url", "verify-url", "external", "all", "all-users", "allow-ui-settings-extension":
+		return true
+	}
+	return false
 }
 
 const bodyFlags = "data file data-file"
