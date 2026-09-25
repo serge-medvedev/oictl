@@ -2024,12 +2024,8 @@ Commands:
 }
 
 func hasHelpFlag(args []string) bool {
-	for i, arg := range args {
-		if arg == "-h" || arg == "--help" || (arg == "help" && i == 0) {
-			return true
-		}
-	}
-	return false
+	_, help := jsonHelpPositionals(args)
+	return help || (len(args) > 0 && args[0] == "help")
 }
 
 func valveUsage(resource string, idName string, scope string, action string) string {

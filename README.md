@@ -19,6 +19,24 @@ The examples below use the built `oictl` binary. The `PATH` setting applies to t
 oictl --help
 ```
 
+Every JSON-consuming action has offline input help, including nested actions and
+file/directory manifests. Both `--help` and `-h` work without selectors, inputs,
+connection configuration, or a server:
+
+```sh
+oictl users create --help
+oictl channels messages update -h
+oictl tools valves user update --help
+oictl files upload --help
+oictl manifests apply --help
+```
+
+The reference distinguishes CLI input from server defaults, replacement behavior,
+and resource-defined fields. Examples use the source contract identified in help;
+a deployment can expose different fields. Request-body sources are `--data JSON`,
+`--file PATH`, or `--data-file PATH`; either body-file option reads stdin for `-`.
+Manifest `--file -` instead names a literal file; its help covers the local envelope.
+
 Set connection details with environment variables:
 
 ```sh

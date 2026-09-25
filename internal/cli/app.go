@@ -50,6 +50,10 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return 0
 	}
 
+	if a.printJSONInputHelp(args) {
+		return 0
+	}
+
 	global, args, err := parseGlobalFlags(args)
 	if err != nil {
 		fmt.Fprintln(a.err, err)
@@ -60,6 +64,14 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return 0
 	}
 
+	if len(args) == 1 || (len(args) == 2 && isHelp(args[1:])) {
+		for key := range jsonInputReferences {
+			if strings.HasPrefix(key, args[0]+" ") {
+				defer fmt.Fprintln(a.out, "\nJSON input fields and examples: append --help or -h to an action (selectors optional).")
+				break
+			}
+		}
+	}
 	if err := validateCommandFlags(args); err != nil {
 		fmt.Fprintln(a.err, err)
 		return 1
