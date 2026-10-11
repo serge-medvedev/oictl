@@ -1,4 +1,4 @@
-# Reconciled at 40bfb776b0fb80802e3af5db5608b1ed58af711f (runtime cad8b3e9).
+# Option contracts renewed against Open WebUI f8ae8a6c3; baseline labels retained.
 # path|kind (A action, G group, B both)|representative operands|local flags|baseline long|baseline short
 # Baseline classifications are evidence labels, not acceptance expectations.
 # Option aliases: url/base-url; data-file/file (bodies); dir/directory; q/query; startIndex/start-index; confirm/yes.
@@ -13,14 +13,14 @@
 -h|A|||help|help
 -v|A|||version|version
 analytics|G|||help|help
-analytics daily|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
-analytics messages|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
-analytics models|B||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|non-help-error
-analytics models chats|A|example-1|start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
-analytics models overview|A|example-1|start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
-analytics summary|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
-analytics tokens|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
-analytics users|A||start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction|requires-value|http-execution
+analytics daily|A||start-date end-date group-id granularity|requires-value|http-execution
+analytics messages|A||start-date end-date user-id model-id chat-id skip limit|requires-value|http-execution
+analytics models|B||start-date end-date group-id|requires-value|non-help-error
+analytics models chats|A|example-1|start-date end-date skip limit order-by direction|requires-value|http-execution
+analytics models overview|A|example-1|days|requires-value|http-execution
+analytics summary|A||start-date end-date group-id|requires-value|http-execution
+analytics tokens|A||start-date end-date group-id|requires-value|http-execution
+analytics users|A||start-date end-date group-id limit|requires-value|http-execution
 api|A|/example|data file data-file method header api-key-header|help|help
 auth|G|||help|help
 auth admin-config|G|||requires-value|non-help-error
@@ -52,7 +52,7 @@ automations|G|||help|help
 automations create|A||data file data-file|help|help
 automations delete|A|example-1|yes confirm|requires-value|non-help-error
 automations get|A|example-1||requires-value|http-execution
-automations list|A||page status limit skip|requires-value|http-execution
+automations list|A||page status|requires-value|http-execution
 automations run|A|example-1||requires-value|http-execution
 automations runs|G|||requires-value|non-help-error
 automations runs list|A|example-1|limit skip|requires-value|http-execution
@@ -91,9 +91,9 @@ chats delete|A|example-1|yes confirm|requires-value|non-help-error
 chats export|A||chat-id all-users|requires-value|http-execution
 chats get|A|example-1||requires-value|http-execution
 chats import|A||data file data-file|help|help
-chats list|A||user-id archived folder-id page limit skip|requires-value|http-execution
+chats list|A||user-id archived folder-id page|requires-value|http-execution
 chats pin|A|example-1||requires-value|http-execution
-chats search|A||query q page limit|requires-value|http-execution
+chats search|A||query q page|requires-value|http-execution
 chats share|A|example-1||requires-value|http-execution
 chats tags|G|||requires-value|non-help-error
 chats tags delete|A|example-1|data file data-file tag|help|help

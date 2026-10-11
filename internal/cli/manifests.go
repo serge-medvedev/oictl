@@ -152,12 +152,21 @@ func (h endpointHandler) Lookup(ctx context.Context, a *App, opts globalOptions,
 	if err != nil {
 		return nil, err
 	}
-	for _, state := range states {
-		if state.ID == desired.Metadata.Name {
-			if h.kind == "Tool" {
-				return h.Fetch(ctx, a, opts, state.ID)
+	lookupIDs := []string{desired.Metadata.Name}
+	if h.kind == "Tool" || h.kind == "Function" {
+		lookupIDs = append(lookupIDs, strings.ToLower(desired.Metadata.Name), strings.ToLower(stringValue(desired.Spec["id"])))
+	}
+	for _, lookupID := range lookupIDs {
+		if lookupID == "" {
+			continue
+		}
+		for _, state := range states {
+			if state.ID == lookupID {
+				if h.kind == "Tool" || h.kind == "Skill" {
+					return h.Fetch(ctx, a, opts, state.ID)
+				}
+				return &state, nil
 			}
-			return &state, nil
 		}
 	}
 	var matches []resourceState
@@ -183,7 +192,7 @@ func (h endpointHandler) Lookup(ctx context.Context, a *App, opts globalOptions,
 		return nil, fmt.Errorf("manifest %s %s/%s identity is ambiguous", desired.Source, h.kind, desired.Metadata.Name)
 	}
 	if len(matches) == 1 {
-		if h.kind == "Tool" {
+		if h.kind == "Tool" || h.kind == "Skill" {
 			return h.Fetch(ctx, a, opts, matches[0].ID)
 		}
 		return &matches[0], nil
@@ -249,16 +258,21 @@ func (h endpointHandler) Update(ctx context.Context, a *App, opts globalOptions,
 
 func (h endpointHandler) manifestPayload(desired manifestDocument, current *resourceState) (map[string]any, error) {
 	payload := map[string]any{}
-	if current != nil && (h.kind == "Tool" || h.kind == "Function" || h.kind == "Prompt" || h.kind == "Skill") {
+	if current != nil && (h.kind == "Tool" || h.kind == "Function" || h.kind == "Prompt" || h.kind == "Skill" || h.kind == "Group" || h.kind == "Knowledge") {
 		payload = copySpec(current.Spec)
 	}
 	for key, value := range desired.Spec {
 		payload[key] = value
 	}
+	// Dedicated ACL actions own grants; resubmitting can re-filter permissions.
+	if current != nil && h.SupportsAccessGrants() {
+		delete(payload, "access_grants")
+	}
 	if h.kind == "Tool" || h.kind == "Function" {
 		if _, ok := payload["id"]; !ok {
 			payload["id"] = desired.Metadata.Name
 		}
+		payload["id"] = strings.ToLower(stringValue(payload["id"]))
 		if _, ok := payload["meta"]; !ok {
 			payload["meta"] = map[string]any{}
 		}
@@ -274,6 +288,16 @@ func (h endpointHandler) manifestPayload(desired manifestDocument, current *reso
 		}
 		if _, ok := payload["content"].(string); !ok {
 			return nil, fmt.Errorf("%s spec.content must be a string for creation/update", h.kind)
+		}
+	}
+	if h.kind == "Group" || h.kind == "Knowledge" {
+		if _, supplied := payload["name"]; !supplied {
+			payload["name"] = desired.Metadata.Name
+		}
+		for _, field := range []string{"name", "description"} {
+			if _, ok := payload[field].(string); !ok {
+				return nil, fmt.Errorf("%s spec.%s must be a string for creation/update", h.kind, field)
+			}
 		}
 	}
 	return payload, nil
@@ -435,7 +459,7 @@ func (h valveHandler) List(context.Context, *App, globalOptions) ([]resourceStat
 }
 
 func (h valveHandler) Lookup(ctx context.Context, a *App, opts globalOptions, desired manifestDocument) (*resourceState, error) {
-	return h.Fetch(ctx, a, opts, desired.Metadata.Name)
+	return h.Fetch(ctx, a, opts, strings.ToLower(desired.Metadata.Name))
 }
 
 func (h valveHandler) Fetch(ctx context.Context, a *App, opts globalOptions, id string) (*resourceState, error) {
@@ -447,7 +471,7 @@ func (h valveHandler) Fetch(ctx context.Context, a *App, opts globalOptions, id 
 }
 
 func (h valveHandler) Create(ctx context.Context, a *App, opts globalOptions, desired manifestDocument) (*resourceState, error) {
-	return h.updateValves(ctx, a, opts, desired.Metadata.Name, desired.Spec)
+	return h.updateValves(ctx, a, opts, strings.ToLower(desired.Metadata.Name), desired.Spec)
 }
 
 func (h valveHandler) Update(ctx context.Context, a *App, opts globalOptions, current resourceState, desired manifestDocument) (*resourceState, error) {
@@ -540,7 +564,7 @@ func (h terminalServerConnectionHandler) Create(ctx context.Context, a *App, opt
 		return nil, err
 	}
 	cfg.connections = append(cfg.connections, conn)
-	return h.postAndFetch(ctx, a, opts, cfg, desired.Metadata.Name)
+	return h.postAndFetch(ctx, a, opts, cfg, stringValue(conn["id"]))
 }
 
 func (h terminalServerConnectionHandler) Update(ctx context.Context, a *App, opts globalOptions, current resourceState, desired manifestDocument) (*resourceState, error) {
@@ -557,7 +581,7 @@ func (h terminalServerConnectionHandler) Update(ctx context.Context, a *App, opt
 		return nil, err
 	}
 	cfg.connections[idx] = conn
-	return h.postAndFetch(ctx, a, opts, cfg, desired.Metadata.Name)
+	return h.postAndFetch(ctx, a, opts, cfg, current.ID)
 }
 
 func (h terminalServerConnectionHandler) Delete(context.Context, *App, globalOptions, resourceState) error {
@@ -602,6 +626,11 @@ func (h terminalServerConnectionHandler) postAndFetch(ctx context.Context, a *Ap
 }
 
 func (h terminalServerConnectionHandler) connectionFromManifest(current map[string]any, desired manifestDocument) (map[string]any, error) {
+	if current != nil {
+		if id, supplied := desired.Spec["id"]; supplied && !jsonEqual(id, current["id"]) {
+			return nil, errors.New("TerminalServerConnection spec.id cannot change an existing connection ID")
+		}
+	}
 	conn := copySpec(current)
 	for key, value := range desired.Spec {
 		conn[key] = value
@@ -689,7 +718,7 @@ func (h channelHandler) UpdateAccessGrants(ctx context.Context, a *App, opts glo
 }
 
 func (h modelHandler) List(ctx context.Context, a *App, opts globalOptions) ([]resourceState, error) {
-	objects, err := a.listAllResources(ctx, opts, "/api/v1/models/list")
+	objects, err := a.listAllResources(ctx, opts, "/api/v1/models/all")
 	if err != nil {
 		return nil, err
 	}
@@ -994,8 +1023,13 @@ func loadManifestDocuments(opts manifestOptions, handlers map[string]resourceHan
 			return nil, err
 		}
 		identity := doc.Kind + "/" + doc.Metadata.Name
+		if doc.Kind == "Tool" || doc.Kind == "Function" {
+			identity = doc.Kind + "/" + strings.ToLower(firstNonEmpty(stringValue(doc.Spec["id"]), doc.Metadata.Name))
+		} else if doc.Kind == "ToolValve" || doc.Kind == "FunctionValve" {
+			identity = doc.Kind + "/" + strings.ToLower(doc.Metadata.Name)
+		}
 		if previous, ok := seen[identity]; ok {
-			return nil, fmt.Errorf("duplicate manifest identity %s in %s and %s", identity, previous, doc.Source)
+			return nil, fmt.Errorf("duplicate manifest identity %s (canonical) in %s and %s", identity, previous, doc.Source)
 		}
 		seen[identity] = doc.Source
 		docs = append(docs, doc)
@@ -1271,6 +1305,15 @@ func validateManifestDocument(doc *manifestDocument, handlers map[string]resourc
 }
 
 func validateManifestFields(doc manifestDocument) error {
+	if doc.Kind == "Group" || doc.Kind == "Knowledge" {
+		for _, field := range []string{"name", "description"} {
+			if value, supplied := doc.Spec[field]; supplied {
+				if _, ok := value.(string); !ok {
+					return fmt.Errorf("%s spec.%s must be a string", doc.Kind, field)
+				}
+			}
+		}
+	}
 	if doc.Kind == "Tool" || doc.Kind == "Function" || doc.Kind == "Prompt" {
 		for _, field := range []string{"id", "name", "command", "content"} {
 			if value, supplied := doc.Spec[field]; supplied {
@@ -1525,7 +1568,7 @@ func preflightManifestDependencies(ctx context.Context, docs []manifestDocument,
 func matchingOwnerDocuments(docs []manifestDocument, kind string, selector string) []manifestDocument {
 	var matches []manifestDocument
 	for _, doc := range docs {
-		if doc.Kind == kind && firstNonEmpty(stringValue(doc.Spec["id"]), doc.Metadata.Name) == selector {
+		if doc.Kind == kind && strings.ToLower(firstNonEmpty(stringValue(doc.Spec["id"]), doc.Metadata.Name)) == strings.ToLower(selector) {
 			matches = append(matches, doc)
 		}
 	}
@@ -1535,7 +1578,7 @@ func matchingOwnerDocuments(docs []manifestDocument, kind string, selector strin
 func matchingOwnerStates(states []resourceState, selector string) []resourceState {
 	var matches []resourceState
 	for _, state := range states {
-		if state.ID == selector {
+		if state.ID == strings.ToLower(selector) {
 			matches = append(matches, state)
 		}
 	}
@@ -1591,6 +1634,7 @@ func buildManifestPlan(ctx context.Context, a *App, opts globalOptions, docs []m
 	plan := manifestPlan{}
 	resolved := map[string]string{}
 	channelCreates := map[string]string{}
+	ownerCreates := map[string]string{}
 	for i := range docs {
 		doc := docs[i]
 		handler := handlers[doc.Kind]
@@ -1599,6 +1643,13 @@ func buildManifestPlan(ctx context.Context, a *App, opts globalOptions, docs []m
 			return manifestPlan{}, err
 		}
 		if current == nil {
+			if doc.Kind == "Tool" || doc.Kind == "Function" {
+				key := doc.Kind + "/" + strings.ToLower(firstNonEmpty(stringValue(doc.Spec["id"]), doc.Metadata.Name))
+				if owner, exists := ownerCreates[key]; exists {
+					return manifestPlan{}, fmt.Errorf("manifests %s and %s create the same canonical owner %s", owner, doc.Metadata.Name, key)
+				}
+				ownerCreates[key] = doc.Metadata.Name
+			}
 			if doc.Kind == "Channel" {
 				name := strings.ToLower(firstNonEmpty(stringValue(doc.Spec["name"]), doc.Metadata.Name))
 				if owner, exists := channelCreates[name]; exists {
@@ -1624,7 +1675,11 @@ func buildManifestPlan(ctx context.Context, a *App, opts globalOptions, docs []m
 			currentSpec = groupSpecForCompare(currentSpec)
 		}
 		if doc.Kind == "Function" || doc.Kind == "Tool" {
-			desiredSpec, currentSpec = functionSpecsForCompare(desiredSpec, currentSpec)
+			desiredSpec, currentSpec = functionSpecsForCompare(desiredSpec, currentSpec, doc.Kind)
+			desiredSpec = copySpec(desiredSpec)
+			if id, supplied := desiredSpec["id"].(string); supplied {
+				desiredSpec["id"] = strings.ToLower(id)
+			}
 		}
 		changes := diffSpec(desiredSpec, currentSpec)
 		if doc.Kind == "Model" {
@@ -1663,10 +1718,10 @@ func buildManifestPlan(ctx context.Context, a *App, opts globalOptions, docs []m
 		if leftResource != rightResource {
 			return leftResource < rightResource
 		}
-		if left.Kind == "Model" && left.Action == "update" && right.Action == "replace-grants" {
+		if left.Action == "update" && right.Action == "replace-grants" {
 			return true
 		}
-		if left.Kind == "Model" && left.Action == "replace-grants" && right.Action == "update" {
+		if left.Action == "replace-grants" && right.Action == "update" {
 			return false
 		}
 		return left.Action < right.Action
@@ -1679,7 +1734,13 @@ func executeManifestPlan(ctx context.Context, a *App, opts globalOptions, plan m
 		return err
 	}
 	created := map[string]resourceState{}
+	latest := map[string]*resourceState{}
+	managedACL := map[string]planAction{}
 	for _, action := range plan.Actions {
+		key := action.Kind + "/" + action.Name
+		if action.Desired != nil && action.Desired.HasAccessGrants && action.Action != "unchanged" {
+			managedACL[key] = action
+		}
 		switch action.Action {
 		case "unchanged", "unsupported":
 			continue
@@ -1689,21 +1750,25 @@ func executeManifestPlan(ctx context.Context, a *App, opts globalOptions, plan m
 				return fmt.Errorf("create %s/%s: %w", action.Kind, action.Name, err)
 			}
 			if state != nil {
+				latest[key] = state
 				created[action.Kind+"/"+action.Name] = *state
 				if action.Desired.HasAccessGrants {
 					updated, err := action.Handler.UpdateAccessGrants(ctx, a, opts, *state, action.Desired.AccessGrants)
 					if err != nil {
 						return fmt.Errorf("replace grants for %s/%s: %w", action.Kind, action.Name, err)
 					}
+					latest[key] = updated
 					if updated != nil && !grantsEqual(action.Desired.AccessGrants, updated.AccessGrants) {
 						return fmt.Errorf("server filtered access grants for %s/%s", action.Kind, action.Name)
 					}
 				}
 			}
 		case "update":
-			if _, err := action.Handler.Update(ctx, a, opts, *action.Current, *action.Desired); err != nil {
+			updated, err := action.Handler.Update(ctx, a, opts, *action.Current, *action.Desired)
+			if err != nil {
 				return fmt.Errorf("update %s/%s: %w", action.Kind, action.Name, err)
 			}
+			latest[key] = updated
 		case "replace-grants":
 			current := action.Current
 			if createdState, ok := created[action.Kind+"/"+action.Name]; ok {
@@ -1716,6 +1781,7 @@ func executeManifestPlan(ctx context.Context, a *App, opts globalOptions, plan m
 			if updated != nil && !grantsEqual(action.Desired.AccessGrants, updated.AccessGrants) {
 				return fmt.Errorf("server filtered access grants for %s/%s", action.Kind, action.Name)
 			}
+			latest[key] = updated
 		case "delete":
 			if workflow != "sync" {
 				continue
@@ -1725,17 +1791,30 @@ func executeManifestPlan(ctx context.Context, a *App, opts globalOptions, plan m
 			}
 		}
 	}
+	// Each handler returns post-write readback. Check the last state, not an
+	// intermediate ACL write, including content-only actions with managed ACLs.
+	for key, action := range managedACL {
+		state := latest[key]
+		if state == nil || !grantsEqual(action.Desired.AccessGrants, state.AccessGrants) {
+			return fmt.Errorf("final access grants did not converge for %s", key)
+		}
+	}
 	return nil
 }
 
 func validateManifestPlan(plan manifestPlan) error {
 	retained, deleted := map[string]bool{}, map[string]bool{}
 	for _, action := range plan.Actions {
-		if action.Action == "create" && (action.Kind == "Tool" || action.Kind == "Function" || action.Kind == "Prompt") {
+		if action.Kind == "TerminalServerConnection" && action.Action == "update" {
+			if _, err := (terminalServerConnectionHandler{}).connectionFromManifest(action.Current.Spec, *action.Desired); err != nil {
+				return err
+			}
+		}
+		if (action.Action == "create" || action.Action == "update") && (action.Kind == "Tool" || action.Kind == "Function" || action.Kind == "Prompt" || action.Kind == "Group" || action.Kind == "Knowledge") {
 			// Use the same payload defaults and requirements as Create, before
 			// any action (or dependency phase) is allowed to mutate resources.
-			if _, err := (endpointHandler{kind: action.Kind}).manifestPayload(*action.Desired, nil); err != nil {
-				return fmt.Errorf("create %s/%s: %w", action.Kind, action.Name, err)
+			if _, err := (endpointHandler{kind: action.Kind}).manifestPayload(*action.Desired, action.Current); err != nil {
+				return fmt.Errorf("%s %s/%s: %w", action.Action, action.Kind, action.Name, err)
 			}
 		}
 		id := action.ID
@@ -2318,7 +2397,7 @@ func normalizeModelSpecForCompare(spec map[string]any) map[string]any {
 	for key, value := range meta {
 		metaCopy[key] = value
 	}
-	for _, key := range []string{"capabilities", "description", "knowledge", "profile_image_url"} {
+	for _, key := range []string{"capabilities", "description", "knowledge", "profile_image_url", "background_image_url", "i18n", "voice", "voice_avatar"} {
 		if value, ok := metaCopy[key]; ok && value == nil {
 			delete(metaCopy, key)
 		}
@@ -2327,7 +2406,7 @@ func normalizeModelSpecForCompare(spec map[string]any) map[string]any {
 	return normalized
 }
 
-func functionSpecsForCompare(desired map[string]any, current map[string]any) (map[string]any, map[string]any) {
+func functionSpecsForCompare(desired map[string]any, current map[string]any, kinds ...string) (map[string]any, map[string]any) {
 	desiredMeta, ok := desired["meta"].(map[string]any)
 	if _, supplied := desired["meta"]; supplied && !ok {
 		return desired, current
@@ -2348,6 +2427,14 @@ func functionSpecsForCompare(desired map[string]any, current map[string]any) (ma
 	}
 	if _, managed := desiredMeta["has_user_valves"]; !managed && normalizedMeta["has_user_valves"] == false {
 		delete(normalizedMeta, "has_user_valves")
+	}
+	if _, managed := desiredMeta["i18n"]; !managed && normalizedMeta["i18n"] == nil {
+		delete(normalizedMeta, "i18n")
+	}
+	if len(kinds) > 0 && kinds[0] == "Function" {
+		if _, managed := desiredMeta["toggle"]; !managed {
+			delete(normalizedMeta, "toggle")
+		}
 	}
 	normalizedCurrent["meta"] = normalizedMeta
 	return desired, normalizedCurrent

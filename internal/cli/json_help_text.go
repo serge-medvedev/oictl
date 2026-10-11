@@ -14,7 +14,8 @@ const localGrantsHelp = `  Required input: bare grant array or {"access_grants":
   are not accepted here (only declarative manifests resolve those selectors).
   Duplicate grants are normalized.
   [] explicitly clears grants; diff compares only, set replaces target grants
-  while retaining the remaining terminal-server configuration.`
+  while retaining the remaining terminal-server configuration.
+  --out writes the result to a file instead of stdout.`
 
 const modelFieldsHelp = `  Model object: required id: string, name: string, meta: object,
   params: object. Creation/import IDs must be nonempty and at most 256 characters.
@@ -210,7 +211,7 @@ const scimPatchHelp = `  Required JSON object with Operations:array (required, c
   Each operation requires op:string; path:optional nullable string, default null;
   value:optional arbitrary JSON, default null. Operation names are case-insensitive.
   This is a SCIM operation envelope, not JSON Patch or a resource document.
-  The CLI forwards it unchanged; unsupported paths/operations are ignored upstream.`
+  The CLI forwards it unchanged; supported operations and errors are resource-specific.`
 
 const functionFieldsHelp = `  Required JSON object: id, name, content are required strings; meta is a
   required object with optional nullable description:string=null and
@@ -231,18 +232,48 @@ const toolFieldsHelp = `  Required JSON object: id, name, content are required s
   Update requires body id (CLI does not inject it); route ID selects target.
   Source/name/meta use full-form update, not a merge; null grants preserve grants.` + nativeGrantsHelp
 
-const skillFieldsHelp = `  Required JSON object: id, name, content are required strings.
-  description:optional nullable string=null; meta:optional object defaults {"tags":[]};
-  meta.tags:optional nullable array of strings, default []; is_active:optional
-  boolean=true; access_grants:optional nullable array of grant objects=null.
-  On creation the server lowercases id and replaces spaces with hyphens.
-  content is Markdown text. Update still requires body id (not injected by CLI);
-  name/content/meta/description/is_active replace existing values with form defaults
-  for omitted optionals; omitted/null grants preserve grants.
+const skillFieldsHelp = `  Required JSON object: id and name are required strings, including on update;
+  the route ID selects the update target (body id is not injected by the CLI).
+  content:optional nullable Markdown string; files:optional nullable file array;
+  data:optional nullable object containing required data.files:file array.
+  File objects require path:string and content:string; encoding may be "base64"
+  for binary supporting files (omit encoding for UTF-8 text). Paths are relative
+  POSIX paths without empty, . or .. components; duplicates are rejected.
+  Packages require a UTF-8 SKILL.md root. Server file/package limits apply.
+  description:optional nullable string=null; meta:optional object defaults to
+  tags:[] and i18n:null. meta.tags:optional nullable string array;
+  meta.i18n:optional nullable locale-to-string-map object. is_active:boolean=true
+  on creation; access_grants:optional nullable grant array=null;
+  commit_message:optional nullable string records a revision message.
   Alternative: --manifest PATH reads Markdown with limited frontmatter, not JSON.
   Supported frontmatter: id/name/description strings, is_active boolean, tags list;
-  body becomes content. Complex access_grants requires JSON. Choose one input source.
+  body becomes content. Complex packages/grants require JSON. Choose one source.
   --manifest - is a literal filename; boolean --manifest supplies no payload.` + nativeGrantsHelp
+
+const skillCreateHelp = skillFieldsHelp + `
+  Creation lowercases id and replaces spaces with hyphens; normalized IDs must
+  contain only a-z, 0-9, _ or -. Supply files or data, not both; package files
+  take precedence over content. With neither package nor content, the server
+  creates an empty SKILL.md. operations and expected_version_id are form fields
+  but are not applied on creation. Creation defaults are not update reset rules.`
+
+const skillUpdateHelp = skillFieldsHelp + `
+  Update preserves omitted description/meta/is_active and file state.
+  content alone replaces SKILL.md while preserving supporting files;
+  omitted content or content:null preserves the root. description:null clears it;
+  supplied meta replaces that metadata object (not a recursive merge).
+  Supply files, data, or operations, not more than one; files/data replace the
+  package. operations:array supports put (path/content, optional encoding),
+  move (path/destination), and delete (path). SKILL.md cannot be moved/deleted.
+  Non-null files/data/operations require expected_version_id:string from the
+  current skills get response; missing version returns 400, mismatch returns 409.
+  content-only updates need no version but may supply one to detect conflicts.
+  If content accompanies a package/operations update, it overrides SKILL.md.
+  Omitted/null access_grants preserves grants; [] clears them.`
+
+const skillUpdateExamples = `{"id":"example-skill","name":"Example Skill","description":"Updated description"}
+{"id":"example-skill","name":"Example Skill","content":"# Updated\nUse scripts/helper.py."}
+{"id":"example-skill","name":"Example Skill","expected_version_id":"version-from-skills-get","operations":[{"op":"put","path":"scripts/helper.py","content":"print('example')\n"}]}`
 
 const openAIConfigHelp = `  Required JSON object: OPENAI_API_BASE_URLS:array of strings,
   OPENAI_API_KEYS:array of strings, OPENAI_API_CONFIGS:object (all required).
@@ -273,6 +304,7 @@ const ollamaConfigHelp = `  Required JSON object: OLLAMA_BASE_URLS:array of stri
 
 const functionExample = `{"id":"example_function","name":"Example Function","content":"class Pipe:\n    def pipe(self, body: dict):\n        return 'Example'\n","meta":{}}`
 const toolExample = `{"id":"example_tool","name":"Example Tool","content":"class Tools:\n    def example(self) -> str:\n        return 'Example'\n","meta":{}}`
+const skillPackageExample = `{"id":"example-skill","name":"Example Skill","files":[{"path":"SKILL.md","content":"# Example\nRun scripts/helper.py."},{"path":"scripts/helper.py","content":"print('example')\n"}],"is_active":false}`
 const skillExample = `{"id":"example-skill","name":"Example Skill","content":"# Example\nDescribe the result.","meta":{"tags":["example"]}}`
 const openAIConfigExample = `{"ENABLE_OPENAI_API":true,"OPENAI_API_BASE_URLS":["https://provider.example.com/v1"],"OPENAI_API_KEYS":["example-key"],"OPENAI_API_CONFIGS":{"0":{"enable":true,"model_ids":["example-model"]}}}`
 const ollamaConfigExample = `{"ENABLE_OLLAMA_API":true,"OLLAMA_BASE_URLS":["https://ollama.example.com"],"OLLAMA_API_CONFIGS":{"0":{"enable":true}}}`

@@ -607,7 +607,20 @@ func (a *App) ensureChannelWebhookByName(ctx context.Context, opts globalOptions
 	if err != nil {
 		return nil, err
 	}
-	return a.doRequest(ctx, opts, requestSpec{method: http.MethodPost, path: listPath + "/create", body: createBody, authRequired: true})
+	// The explicit body is intentionally read only when creation is needed.
+	// Reject a different lookup identity rather than rewriting literal input.
+	data, err := io.ReadAll(createBody)
+	if err != nil {
+		return nil, err
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(payload["name"].(string)) != name {
+		return nil, errors.New("webhook create-body name must match --name lookup identity")
+	}
+	return a.doRequest(ctx, opts, requestSpec{method: http.MethodPost, path: listPath + "/create", body: bytes.NewReader(data), authRequired: true})
 }
 
 func (a *App) revealChannelWebhookURL(ctx context.Context, opts globalOptions, flags commandFlags, listPath string, webhookID string) int {
@@ -1828,7 +1841,7 @@ Markdown manifests support frontmatter keys id, name, description, is_active, an
 			fmt.Fprintln(a.err, err)
 			return 1
 		}
-		return simple(http.MethodGet, skillPath(pos[0], ""), nil)
+		return simple(http.MethodGet, appendQuery("/api/v1/skills/export", map[string]string{"ids": pos[0]}), nil)
 	}
 	fmt.Fprintf(a.err, "unknown skills command %q\n", action)
 	return 1
@@ -2497,9 +2510,14 @@ Commands:
 		if flags.values["folder-id"] != "" {
 			path = "/api/v1/chats/folder/" + url.PathEscape(flags.values["folder-id"]) + "/list"
 		}
-		return simple(http.MethodGet, appendQuery(path, map[string]string{"page": flags.values["page"], "limit": flags.values["limit"], "skip": flags.values["skip"]}), nil)
+		return simple(http.MethodGet, appendQuery(path, map[string]string{"page": flags.values["page"]}), nil)
 	case "search":
-		return simple(http.MethodGet, appendQuery("/api/v1/chats/search", map[string]string{"query": firstNonEmpty(flags.values["query"], flags.values["q"]), "text": firstNonEmpty(flags.values["query"], flags.values["q"]), "page": flags.values["page"], "limit": flags.values["limit"]}), nil)
+		query := firstNonEmpty(flags.values["query"], flags.values["q"])
+		if query == "" {
+			fmt.Fprintln(a.err, "a chat search query is required; use --query or --q")
+			return 1
+		}
+		return simple(http.MethodGet, appendQuery("/api/v1/chats/search", map[string]string{"text": query, "page": flags.values["page"]}), nil)
 	case "get":
 		if err := requireArgs(pos, 1, "oictl chats get <chat-id>"); err != nil {
 			fmt.Fprintln(a.err, err)
@@ -2716,7 +2734,7 @@ Delete requires --yes.
 	}
 	switch action {
 	case "list":
-		return simple(http.MethodGet, appendQuery("/api/v1/automations/list", map[string]string{"page": flags.values["page"], "status": flags.values["status"], "limit": flags.values["limit"], "skip": flags.values["skip"]}), nil)
+		return simple(http.MethodGet, appendQuery("/api/v1/automations/list", map[string]string{"page": flags.values["page"], "status": flags.values["status"]}), nil)
 	case "create":
 		body, err := requiredBody(flags, "an automation payload is required")
 		if err != nil {
@@ -3047,6 +3065,16 @@ func (a *App) doStream(ctx context.Context, opts globalOptions, spec requestSpec
 	if err != nil {
 		return err
 	}
+	// Capture the effective credential, including environment/profile sources,
+	// before transport/read/close errors reach the caller's diagnostic sink.
+	defer func() {
+		if retErr != nil {
+			text := redactText(retErr.Error(), target.token)
+			if text != retErr.Error() {
+				retErr = errors.New(text)
+			}
+		}
+	}()
 	targetURL, err := joinURL(target.baseURL, spec.path)
 	if err != nil {
 		return err
@@ -3088,10 +3116,11 @@ func (a *App) doStream(ctx context.Context, opts globalOptions, spec requestSpec
 	}
 	defer func() { retErr = errors.Join(retErr, resp.Body.Close()) }()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		fmt.Fprintln(a.err, resp.Status)
+		status := fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+		fmt.Fprintln(a.err, status)
 		body, _ := io.ReadAll(resp.Body)
-		_, _ = a.err.Write([]byte(redactSecrets(string(body), target.token)))
-		return httpStatusError{status: resp.Status}
+		_, _ = a.err.Write([]byte(redactText(string(body), target.token)))
+		return httpStatusError{status: status}
 	}
 	out := a.out
 	if spec.outPath != "" || opts.outPath != "" {
@@ -3164,16 +3193,7 @@ func rejectUnsafeProviderHeaders(headers []headerValue) error {
 }
 
 func redactSecrets(text string, secrets ...string) string {
-	for _, secret := range secrets {
-		secret = strings.TrimSpace(secret)
-		if secret != "" {
-			text = strings.ReplaceAll(text, secret, "<redacted>")
-		}
-	}
-	text = channelWebhookURLPattern.ReplaceAllString(text, "<redacted>")
-	text = webhookTokenFieldPattern.ReplaceAllString(text, "$1<redacted>$2")
-	text = webhookURLFieldPattern.ReplaceAllString(text, "$1<redacted>$2")
-	return text
+	return redactText(text, secrets...)
 }
 
 var (

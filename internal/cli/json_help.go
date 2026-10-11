@@ -6,7 +6,9 @@ import (
 )
 
 // Help-only authored references, not dispatch or validation metadata. Upstream
-// locators refer to backend/open_webui at 0aa65cd1c9d42d6458976598b0551f3e37968ace.
+// UI settings, SCIM user PATCH and Skill references were renewed against
+// f8ae8a6c328946dc62cd0712961a0632574581bf. Other upstream locators refer
+// to backend/open_webui at 0aa65cd1c9d42d6458976598b0551f3e37968ace.
 type jsonInputHelp struct {
 	usage, input, examples string
 }
@@ -52,8 +54,8 @@ var jsonInputReferences = map[string]jsonInputHelp{
   Inspect separately: oictl functions valves user spec <function-id>
   Server removes null values and stores explicitly supplied validated values.
   Example is illustrative for a resource with no required user valves.`, `{}`}, // Source: routers/functions.py: update_function_user_valves_by_id; surfaces.go: runValves
-	"skills create": {"skills create [--manifest PATH]", skillFieldsHelp, skillExample},            // Source: models/skills.py: SkillForm, SkillMeta; routers/skills.py: create_new_skill; surfaces.go: skillPayloadBody, parseSkillManifest
-	"skills update": {"skills update <skill-id> [--manifest PATH]", skillFieldsHelp, skillExample}, // Source: models/skills.py: SkillForm; routers/skills.py: update_skill_by_id; surfaces.go: skillPayloadBody
+	"skills create": {"skills create [--manifest PATH]", skillCreateHelp, skillExample + "\n" + skillPackageExample}, // Source: models/skills.py: SkillForm, SkillMeta; routers/skills.py: create_new_skill; surfaces.go: skillPayloadBody, parseSkillManifest
+	"skills update": {"skills update <skill-id> [--manifest PATH]", skillUpdateHelp, skillUpdateExamples},            // Source: models/skills.py: SkillForm; routers/skills.py: update_skill_by_id; surfaces.go: skillPayloadBody
 	"skills access-update": {"skills access-update <skill-id>", `  Required JSON object with required access_grants:array of grant objects.
   This replaces grants only, not the full skill form.` + nativeGrantsHelp, `{"access_grants":[]}`}, // Source: routers/skills.py: SkillAccessGrantsForm, update_skill_access_by_id
 	"tools create": {"tools create", toolFieldsHelp, toolExample},           // Source: models/tools.py: ToolForm, ToolMeta; routers/tools.py: create_new_tools
@@ -148,12 +150,14 @@ var jsonInputReferences = map[string]jsonInputHelp{
   it under server password policy. Email is lowercased; profile URLs validated.
   Role is an unconstrained form string, not a CLI enum.`, `{"name":"Updated Example User","role":"user"}`}, // Source: models/users.py: UserUpdateForm; routers/users.py: update_user_by_id
 	"users settings update": {"users settings update [--allow-sensitive-ui-keys]", `  Required JSON settings object. ui:optional nullable free-form object,
-  server default {}. ui keys/types belong to the UI version; for example
-  theme:string. Server replaces the ui value, not a recursive merge, while
-  preserving unrelated stored top-level settings. Omission resets ui to {};
-  ui:null stores null. Settings also allow extra top-level keys.
+  ui keys/types belong to the UI version; for example theme:string.
+  Server shallow-patches UI keys: omitted keys retain their values;
+  per-key null removes that key. Nested objects replace that key's value;
+  this is not a recursive merge. Omission, {}, and ui:null preserve existing UI.
+  Unmentioned top-level settings are retained; settings allow extra top-level keys.
   ui.toolServers requires --allow-sensitive-ui-keys in the CLI.
-  Example is illustrative of current-user UI preferences, not a cross-user patch.`, `{"ui":{"theme":"dark"}}`}, // Source: models/users.py: UserSettings, update_user_settings_by_id; routers/users.py: update_user_settings_by_session_user; surfaces.go: userSettingsMutationBody
+  Example is illustrative of current-user UI preferences, not a cross-user patch.`, `{"ui":{"theme":"dark"}}
+{"ui":{"language":null}}`}, // Source: models/users.py: UserSettings, update_user_settings_by_id; routers/users.py: update_user_settings_by_session_user; surfaces.go: userSettingsMutationBody
 	"users ui-settings patch": {"users ui-settings patch <user-id> --allow-ui-settings-extension [--allow-sensitive-ui-keys]", uiPatchHelp, `{"theme":"dark"}`}, // Source: surfaces.go: runUsers, userSettingsMutationBody (deployment extension)
 	"users ui-settings bulk-patch": {"users ui-settings bulk-patch [<user-id>...] --allow-ui-settings-extension [--user-id ID] [--users-file PATH] [--all | --query TEXT] [--dry-run] [--yes | --confirm]", uiPatchHelp + `
   Targets: positional IDs, repeated --user-id, and --users-file may be combined.
@@ -192,9 +196,18 @@ var jsonInputReferences = map[string]jsonInputHelp{
   nonempty names/email/photo lists update, while active:false deactivates a user.
 ` + scimUserNestedHelp, `{"displayName":"Updated Example User","emails":[{"value":"user@example.com"}],"photos":null}`}, // Source: routers/scim.py: SCIMUserUpdateRequest, update_user
 	"scim users patch": {"scim users patch <id> [--scim-token TOKEN]", scimPatchHelp + `
-  Upstream implements replace only, for active (boolean), userName, displayName,
-  emails[primary eq true].value, name.formatted, externalId (string values).
-  add/remove and pathless operations are not implemented by this route.`, `{"Operations":[{"op":"replace","path":"active","value":false}]}`}, // Source: routers/scim.py: SCIMPatchRequest, SCIMPatchOperation, patch_user
+  User PATCH supports add/replace with a supported path, or a pathless
+  nonempty attribute object whose keys are supported paths (not nested objects).
+  Supported values: active:boolean; userName, displayName,
+  emails[primary eq true].value, name.formatted:string; externalId:string|null.
+  Only remove externalId is supported. An existing admin is not demoted by active.
+  Invalid operations return 400; unsupported paths return 400/invalidPath,
+  invalid typed values or pathless bodies 400/invalidValue, missing remove path
+  400/noTarget, and other removals 400/mutability. All operations validate before
+  persistence; omitted attributes retain their current values.`, `{"Operations":[{"op":"replace","path":"active","value":false}]}
+{"Operations":[{"op":"add","path":"displayName","value":"Example User"}]}
+{"Operations":[{"op":"replace","value":{"displayName":"Updated Example User","externalId":"example-idp-id"}}]}
+{"Operations":[{"op":"remove","path":"externalId"}]}`}, // Source: routers/scim.py: SCIMPatchRequest, SCIMPatchOperation, patch_user
 	"scim groups create": {"scim groups create [--scim-token TOKEN]", `  Required JSON object: displayName:string required; members:optional nullable
   array, server default []. Creates a group with listed membership.
 ` + scimGroupNestedHelp, `{"displayName":"Example Team","members":[{"value":"user-a"}]}`}, // Source: routers/scim.py: SCIMGroupCreateRequest, SCIMGroupMember, create_group
@@ -329,6 +342,9 @@ null`}, // Source: terminal_servers.go: decodeDesiredAccessGrants, runTerminalSe
   oauth_server_url, oauth_scope. --type is a query parameter, not a JSON field.
   CLI permits no body; upstream requires the form.`, `{"url":"https://tools.example.com","client_id":"example-client","oauth_scope":"openid"}`}, // Source: routers/configs.py: OAuthClientRegistrationForm, register_oauth_client
 	"files upload": {"files upload <path> [--metadata JSON] [--process BOOL] [--process-in-background BOOL]", `  <path> is raw uploaded file content, not a JSON body file.
+  The file part carries a MIME type inferred from filename/media bytes, with a
+  binary fallback for unknown content. Server MIME-dependent media processing
+  (including audio transcription) uses this type, subject to server configuration.
   --metadata is optional inline JSON sent unchanged as a multipart text field;
   the CLI does not validate it or read it from a file/stdin. The server expects
   an extensible object: optional file_hash:string (otherwise hashes file bytes),

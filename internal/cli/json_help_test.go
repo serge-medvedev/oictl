@@ -17,7 +17,7 @@ func TestJSONHelpOperatorFocusedContent(t *testing.T) {
 		{"models sync", []string{"model records", "record requires", "user_id", "record defaults", "created_at"}, []string{"SyncModelsForm", "ModelModel"}},
 		{"auth login", []string{"email:string", "password:string", "--save"}, []string{"SigninForm"}},
 		{"files update-content", []string{"content:string", "empty string", "server requires"}, []string{"ContentForm"}},
-		{"users settings update", []string{"extra top-level keys", "ui:null", "Omission resets"}, []string{"UserSettings"}},
+		{"users settings update", []string{"extra top-level keys", "ui:null", "shallow-patches", "preserve existing UI", "null removes", "not a recursive merge"}, []string{"UserSettings", "Omission resets", "ui:null stores null", "replaces the ui value"}},
 		{"webhooks events update", []string{"Omitted fields retain existing values", "explicit null is applied"}, []string{"exclude_unset"}},
 		{"providers ollama verify", []string{"url:string", "key:optional nullable", "no OLLAMA_API_CONFIGS envelope"}, []string{"backend /api/version"}},
 		{"providers openai request", []string{"--method POST chat/completions", "messages:array"}, []string{"selected /openai endpoint"}},

@@ -3229,7 +3229,7 @@ func TestChatsRequestsPayloadsOutputAndConfirmation(t *testing.T) {
 			}
 			_, _ = io.WriteString(w, `[{"id":"c1","title":"Ops Review"}]`)
 		case "/api/v1/chats/search":
-			if r.URL.Query().Get("query") != "tag:ops" {
+			if r.URL.Query().Get("text") != "tag:ops" {
 				t.Fatalf("query = %s", r.URL.RawQuery)
 			}
 			_, _ = io.WriteString(w, `[{"id":"c2","title":"Incident"}]`)

@@ -53,9 +53,9 @@ Manifest string values can reference environment variables with simple `${VAR}` 
 
 For manifest-managed resources that expose `spec.is_active`, active state is reconciled only when `is_active` is present in the manifest. If `spec.is_active` is omitted, `diff` and `apply` preserve the remote active state for existing resources.
 
-Resource discovery follows all reported pages before matching, grant resolution, or pruning. Exact remote IDs take precedence over aliases; ambiguous names and multiple documents resolving to the same resource are rejected. A resolved resource is protected from pruning regardless of the alias used in its manifest.
+Resource discovery follows all reported pages before matching, grant resolution, or pruning. Model manifests use the administrative `/api/v1/models/all` inventory, including managed base records with null `base_model_id`; an administrator credential is required and inventory authorization failures stop planning. Exact remote IDs take precedence over aliases; ambiguous names and multiple documents resolving to the same resource are rejected. A resolved resource is protected from pruning regardless of the alias used in its manifest.
 
-Tool create forms default omitted `spec.id` to `metadata.name` and omitted `spec.meta` to `{}`. Function create forms also default omitted `spec.meta` to `{}`. Prompt forms use `spec.name` (not `title`); creation defaults it to `metadata.name` when omitted. Omitted fields remain unmanaged when updating existing resources. Required source content and essential field types are validated before mutation.
+Tool create forms default omitted `spec.id` to `metadata.name` and omitted `spec.meta` to `{}`. Function create forms also default omitted `spec.meta` to `{}`. Prompt forms use `spec.name` (not `title`); creation defaults it to `metadata.name` when omitted. Omitted fields remain unmanaged when updating existing resources. Required source content and essential field types are validated before mutation. Group and Knowledge creation require a string `description`; existing updates overlay declared fields on the current required name/description form. Prompt, Tool, and Knowledge content updates omit ACL fields, preserving unmanaged grants. Dedicated grant replacements run after source updates and verify the resulting ACL.
 
 ## Prompt
 
@@ -191,6 +191,8 @@ Examples:
 
 ## Function
 
+Tool and Function IDs follow upstream creation lowercasing. Owner lookup, repeat comparison, and same-set valve dependencies use that canonical ID; documents colliding on a canonical owner ID are rejected before mutation.
+
 Function manifests manage Open WebUI function records. They do not support `access_grants`. Explicit `spec.is_active` and `spec.is_global` changes use the corresponding dedicated toggles with readback; omitted state remains unmanaged.
 
 ```json
@@ -235,7 +237,8 @@ Group manifests manage native Open WebUI groups. They do not support `access_gra
   "metadata": { "name": "sre" },
   "spec": {
     "id": "sre",
-    "name": "SRE"
+    "name": "SRE",
+    "description": "Site reliability engineering"
   }
 }
 ```
@@ -263,7 +266,7 @@ Open WebUI generates channel IDs and lowercases names. An exact ID in `metadata.
 
 ## Terminal Server Connection
 
-Terminal server connection manifests update entries inside `/api/v1/configs/terminal_servers`. `metadata.name` resolves by exact connection `id` first, then unique `name`. Top-level manifest `access_grants` are written to nested `config.access_grants`; omitting `access_grants` preserves existing grants, even when `spec.config` is replaced or set to null. Specs can contain connection secrets such as keys, so store manifests accordingly.
+Terminal server connection manifests update entries inside `/api/v1/configs/terminal_servers`. `metadata.name` resolves by exact connection `id` first, then unique `name`. Top-level manifest `access_grants` are written to nested `config.access_grants`; omitting `access_grants` preserves existing grants, even when `spec.config` is replaced or set to null. Rename readback uses the resolved stable ID, not the old name. Existing connection IDs cannot be changed through a manifest; use the stable ID in subsequent manifests after a rename. Specs can contain connection secrets such as keys, so store manifests accordingly.
 
 ```json
 {

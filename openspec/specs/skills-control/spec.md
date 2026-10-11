@@ -71,10 +71,11 @@ The CLI SHALL provide a command to export Skills returned by Open WebUI.
 
 #### Scenario: One Skill is exported as JSON
 - **WHEN** the user runs `oictl skills export <skill-id>`
-- **THEN** the CLI retrieves that Skill and prints the JSON Skill response
+- **THEN** the CLI requests the package export endpoint with that Skill's ID and prints the JSON package, including root and supporting file bytes
+- **AND** package export does not include ACL grants, owner, history, or `version_id`; detail/access inspection is separate
 
 ### Requirement: Markdown Skill manifest support
-The CLI SHALL support a bounded Markdown Skill manifest format for human-authored Skill create, update, and single-Skill export workflows.
+The CLI SHALL support a bounded Markdown Skill manifest format for human-authored Skill create, update, and single-Skill export workflows. Markdown carries only root `SKILL.md` content and the supported frontmatter fields; it is not a package backup and cannot preserve supporting files or complex metadata/grants.
 
 #### Scenario: Skill is created from Markdown manifest
 - **WHEN** the user runs `oictl skills create --manifest skill.md`

@@ -78,7 +78,11 @@ func isBooleanCommandFlag(name string) bool {
 const bodyFlags = "data file data-file"
 const confirmationFlags = "yes confirm"
 const directoryFlags = "query q page order-by direction"
-const analyticsFlags = "start-date end-date group-id user-id model-id chat-id skip limit days granularity order-by direction"
+
+// Report query contracts are endpoint-specific; unknown query keys are silently
+// ignored by upstream and must not appear to constrain a successful report.
+const analyticsDateFlags = "start-date end-date"
+const analyticsAggregateFlags = analyticsDateFlags + " group-id"
 
 var commandFlagAllowlist = map[string]string{
 	"api":                                        bodyFlags + " method header api-key-header",
@@ -203,21 +207,23 @@ var commandFlagAllowlist = map[string]string{
 	"tools export":                               "manifest directory dir",
 	"tools valves update":                        bodyFlags,
 	"tools valves user update":                   bodyFlags,
-	"chats list":                                 "user-id archived folder-id page limit skip",
-	"chats search":                               "query q page limit",
+	"chats list":                                 "user-id archived folder-id page",
+	"chats search":                               "query q page",
 	"chats export":                               "chat-id all-users",
 	"chats import":                               bodyFlags,
 	"chats compact":                              bodyFlags + " model",
 	"chats delete":                               confirmationFlags,
 	"chats tags set":                             bodyFlags + " tag",
 	"chats tags delete":                          bodyFlags + " tag",
-	"analytics models":                           analyticsFlags,
-	"analytics users":                            analyticsFlags,
-	"analytics messages":                         analyticsFlags,
-	"analytics summary":                          analyticsFlags,
-	"analytics daily":                            analyticsFlags,
-	"analytics tokens":                           analyticsFlags,
-	"automations list":                           "page status limit skip",
+	"analytics models":                           analyticsAggregateFlags,
+	"analytics models chats":                     analyticsDateFlags + " skip limit order-by direction",
+	"analytics models overview":                  "days",
+	"analytics users":                            analyticsAggregateFlags + " limit",
+	"analytics messages":                         analyticsDateFlags + " user-id model-id chat-id skip limit",
+	"analytics summary":                          analyticsAggregateFlags,
+	"analytics daily":                            analyticsAggregateFlags + " granularity",
+	"analytics tokens":                           analyticsAggregateFlags,
+	"automations list":                           "page status",
 	"automations create":                         bodyFlags,
 	"automations update":                         bodyFlags,
 	"automations delete":                         confirmationFlags,

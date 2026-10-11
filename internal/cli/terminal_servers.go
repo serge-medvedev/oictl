@@ -42,7 +42,7 @@ func (a *App) runTerminalServerAccessGrants(ctx context.Context, opts globalOpti
 			fmt.Fprintln(a.err, err)
 			return 1
 		}
-		return writeJSON(a.out, a.err, terminalServerAccessGrants(conn))
+		return a.writeTerminalServerGrantOutput(opts, flags, terminalServerAccessGrants(conn))
 	case "diff":
 		desired, err := readDesiredAccessGrants(flags)
 		if err != nil {
@@ -60,7 +60,7 @@ func (a *App) runTerminalServerAccessGrants(ctx context.Context, opts globalOpti
 			return 1
 		}
 		added, removed := diffGrants(desired, terminalServerAccessGrants(conn))
-		return writeJSON(a.out, a.err, map[string]any{"grants_added": added, "grants_removed": removed})
+		return a.writeTerminalServerGrantOutput(opts, flags, map[string]any{"grants_added": added, "grants_removed": removed})
 	case "set":
 		desired, err := readDesiredAccessGrants(flags)
 		if err != nil {
@@ -107,7 +107,7 @@ func (a *App) runTerminalServerAccessGrants(ctx context.Context, opts globalOpti
 			result["server_grants_missing"] = missing
 			result["server_grants_extra"] = extra
 		}
-		return writeJSON(a.out, a.err, result)
+		return a.writeTerminalServerGrantOutput(opts, flags, result)
 	default:
 		fmt.Fprintf(a.err, "unknown terminal server access-grants command %q\n", action)
 		return 1
@@ -261,12 +261,13 @@ func mutableTerminalServerConfigObject(conn map[string]any) (map[string]any, err
 	return copySpec(config), nil
 }
 
-func writeJSON(out io.Writer, errOut io.Writer, value any) int {
-	encoder := json.NewEncoder(out)
+func (a *App) writeTerminalServerGrantOutput(opts globalOptions, flags commandFlags, value any) int {
+	var body bytes.Buffer
+	encoder := json.NewEncoder(&body)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(value); err != nil {
-		fmt.Fprintln(errOut, err)
+		fmt.Fprintln(a.err, err)
 		return 1
 	}
-	return 0
+	return a.writeResponse(opts, requestSpec{outPath: flags.values["out"]}, body.Bytes())
 }

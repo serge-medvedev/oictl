@@ -100,12 +100,15 @@ const manifestInputHelp = `  One JSON object per file (YAML .yaml/.yml also acce
       id:string required on creation (CLI does not synthesize it); name:string
       defaults to metadata.name only if neither id nor name supplies identity.
       Therefore supply both id and name for new skills. Server lowercases creation
-      IDs and replaces spaces with hyphens. content:string required
-      on creation or content_file. description:nullable string=null;
-      meta:object defaults {"tags":[]}, tags:nullable array of strings default [];
-      is_active:boolean=true on creation. Existing fetched fields, including
-      content and active state, are preserved if omitted. Top-level grants are
-      separate. This envelope is NOT skills create --manifest Markdown.
+      IDs and replaces spaces with hyphens. content:optional nullable Markdown,
+      or content_file; creation without content creates an empty SKILL.md.
+      description:nullable string=null; meta:object defaults tags:[]/i18n:null,
+      tags:nullable string array; is_active:boolean=true on creation.
+      Existing root/metadata/active fields are preserved if omitted; content
+      updates preserve supporting files. Packages and file operations are
+      not reconciled by this manifest kind; use native skills create/update JSON for
+      packages, expected_version_id, and operations. Top-level grants are separate.
+      This envelope is NOT skills create --manifest Markdown.
     TerminalServerConnection:
       One connection, not {"TERMINAL_SERVER_CONNECTIONS":[...]}.
       url:string required on creation; id/name:nullable strings (CLI fills blank

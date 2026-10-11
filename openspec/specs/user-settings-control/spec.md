@@ -21,7 +21,7 @@ The CLI SHALL provide a command to fetch the authenticated user's Open WebUI set
 - **THEN** the CLI prints the returned settings response
 
 ### Requirement: Current-user settings update
-The CLI SHALL provide a command to replace or update the authenticated user's Open WebUI settings with a JSON payload accepted by the server.
+The CLI SHALL provide a command to update the authenticated user's Open WebUI settings with a JSON payload accepted by the server. Current upstream shallow-patches `ui` keys: omission and root `ui:null` preserve existing UI settings, per-key null removes that key, and nested values are replaced rather than recursively merged. Unmentioned top-level settings are retained; server permission filtering still applies.
 
 #### Scenario: Current user settings are updated from a file
 - **WHEN** the user runs `oictl users settings update --file settings.json`

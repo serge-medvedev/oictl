@@ -49,7 +49,7 @@ func TestReviewManifestDuplicateTargetsAcrossDependencyPhases(t *testing.T) {
 	dir := t.TempDir()
 	writeManifest(t, dir+"/a.json", `{"apiVersion":"oictl.openwebui/v1","kind":"Prompt","metadata":{"name":"uuid"},"spec":{"content":"changed"}}`)
 	writeManifest(t, dir+"/b.json", `{"apiVersion":"oictl.openwebui/v1","kind":"Prompt","metadata":{"name":"Display"},"spec":{"content":"changed"},"access_grants":[{"principal_type":"group","principal_name":"new-group","permission":"read"}]}`)
-	writeManifest(t, dir+"/g.json", `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"new-group"},"spec":{"name":"new-group"}}`)
+	writeManifest(t, dir+"/g.json", `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"new-group"},"spec":{"name":"new-group","description":"Example group"}}`)
 	remote := map[string]any{"id": "uuid", "command": "slash", "name": "Display", "content": "old"}
 	groups := []any{}
 	mutations := 0
@@ -254,7 +254,7 @@ func TestReviewManifestMissingCreateContentPreflight(t *testing.T) {
 					writeManifest(t, dir+"/a.json", `{"apiVersion":"oictl.openwebui/v1","kind":"Channel","metadata":{"name":"earlier"},"spec":{"name":"earlier"}}`)
 					doc := manifestDocument{APIVersion: manifestAPIVersion, Kind: kind, Metadata: manifestMetadata{Name: "sample"}, Spec: map[string]any{"name": "sample"}}
 					if dependency == "group" {
-						writeManifest(t, dir+"/g.json", `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"new-group"},"spec":{"name":"new-group"}}`)
+						writeManifest(t, dir+"/g.json", `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"new-group"},"spec":{"name":"new-group","description":"Example group"}}`)
 						grant := []accessGrant{{PrincipalType: "group", PrincipalName: "new-group", Permission: "read"}}
 						if kind == "Function" {
 							// Functions do not support grants; defer a companion Channel.
@@ -522,7 +522,7 @@ func TestReviewManifestOmittedActivePreserved(t *testing.T) {
 						remote[key] = value
 					}
 				}
-				if strings.HasSuffix(r.URL.Path, "/list") {
+				if strings.HasSuffix(r.URL.Path, "/list") || strings.HasSuffix(r.URL.Path, "/all") {
 					_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{remote}, "total": 1})
 				} else {
 					_ = json.NewEncoder(w).Encode(remote)
@@ -594,6 +594,10 @@ func TestReviewManifestCompleteInventories(t *testing.T) {
 			calls := 0
 			app := reviewManifestApp(t, func(w http.ResponseWriter, r *http.Request) {
 				calls++
+				if strings.Contains(r.URL.Path, "/skills/id/") {
+					_ = json.NewEncoder(w).Encode(map[string]any{"id": "wanted", "name": "wanted", "content": "source"})
+					return
+				}
 				id := "first"
 				if r.URL.Query().Get("page") == "2" {
 					id = "wanted"
@@ -601,7 +605,7 @@ func TestReviewManifestCompleteInventories(t *testing.T) {
 				_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{map[string]any{"id": id, "name": id}}, "total": 2})
 			})
 			state, err := manifestHandlers()[kind].Lookup(context.Background(), app, globalOptions{}, manifestDocument{Metadata: manifestMetadata{Name: "wanted"}})
-			if err != nil || state == nil || state.ID != "wanted" || calls != 2 {
+			if err != nil || state == nil || state.ID != "wanted" || calls != map[string]int{"Knowledge": 2, "Model": 2, "Skill": 3}[kind] {
 				t.Fatalf("state=%+v calls=%d err=%v", state, calls, err)
 			}
 		})

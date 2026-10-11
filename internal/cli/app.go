@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -38,6 +40,29 @@ func New(out io.Writer, err io.Writer, version string) *App {
 }
 
 func (a *App) Run(ctx context.Context, args []string) int {
+	// Family help recursively calls Run. The outer boundary owns checking and
+	// reporting, after all deferred help suffixes have also been written.
+	if _, nested := a.out.(*checkedWriter); nested {
+		return a.run(ctx, args)
+	}
+	out := &checkedWriter{writer: a.out}
+	diagnostics := &checkedWriter{writer: a.err}
+	scoped := *a
+	scoped.out, scoped.err = out, diagnostics
+	code := scoped.run(ctx, args)
+	if out.err != nil {
+		if code == 0 {
+			fmt.Fprintf(diagnostics, "write output: %v\n", out.err)
+		}
+		return 1
+	}
+	if diagnostics.err != nil {
+		return 1
+	}
+	return code
+}
+
+func (a *App) run(ctx context.Context, args []string) int {
 	select {
 	case <-ctx.Done():
 		fmt.Fprintln(a.err, ctx.Err())
@@ -288,6 +313,23 @@ func parseGlobalFlags(args []string) (globalOptions, []string, error) {
 			}
 		default:
 			remaining = append(remaining, arg)
+			// Local scalar values are opaque, even when they spell a global
+			// option. Keep the help scanner's action-specific manifest boundary.
+			if hasValue || isBooleanCommandFlag(name) {
+				continue
+			}
+			if name == "manifest" {
+				pos, _ := jsonHelpPositionals(remaining)
+				isSkillInput := len(pos) >= 2 && pos[0] == "skills" && (pos[1] == "create" || pos[1] == "update")
+				isToolExport := len(pos) >= 2 && pos[0] == "tools" && pos[1] == "export"
+				if !isSkillInput && (isToolExport || i+1 >= len(args) || strings.HasPrefix(args[i+1], "--")) {
+					continue
+				}
+			}
+			if i+1 < len(args) {
+				i++
+				remaining = append(remaining, args[i])
+			}
 		}
 	}
 	return opts, remaining, nil
@@ -494,11 +536,23 @@ func (a *App) deleteProfileToken(name string) error {
 	return a.saveProfile(name, profile)
 }
 
-func (a *App) doRequest(ctx context.Context, opts globalOptions, spec requestSpec) ([]byte, error) {
+func (a *App) doRequest(ctx context.Context, opts globalOptions, spec requestSpec) (response []byte, requestErr error) {
 	target, err := a.resolveTarget(opts, spec.authRequired)
 	if err != nil {
 		return nil, err
 	}
+	secrets := append([]string{target.token, spec.bearerToken}, spec.redactValues...)
+	defer func() {
+		var statusErr httpStatusError
+		// Status errors already contain canonical, never peer-supplied status
+		// text and a sanitized body. Keep their type for quiet-error callers.
+		if requestErr != nil && !errors.As(requestErr, &statusErr) {
+			text := redactText(requestErr.Error(), secrets...)
+			if text != requestErr.Error() {
+				requestErr = errors.New(text)
+			}
+		}
+	}()
 	targetURL, err := joinURL(target.baseURL, spec.path)
 	if err != nil {
 		return nil, err
@@ -547,6 +601,31 @@ func (a *App) doRequest(ctx context.Context, opts globalOptions, spec requestSpe
 	if client == nil {
 		client = http.DefaultClient
 	}
+	if spec.apiKeyHeader != "" && !spec.skipAuth && spec.bearerToken == "" && target.token != "" {
+		// Clone rather than modifying a shared client. Custom credential headers
+		// are not covered by net/http's Authorization redirect protections.
+		guarded := *client
+		originalPolicy := client.CheckRedirect
+		guarded.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+			if originalPolicy != nil {
+				if err := originalPolicy(next, via); err != nil {
+					return err
+				}
+			} else if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			// Origin changes (including ports and HTTPS downgrades) must not
+			// transfer the credential. Keep it stripped through the whole chain.
+			for _, previous := range via {
+				if !sameCredentialOrigin(next.URL, previous.URL) {
+					next.Header.Del(spec.apiKeyHeader)
+					break
+				}
+			}
+			return nil
+		}
+		client = &guarded
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -557,15 +636,31 @@ func (a *App) doRequest(ctx context.Context, opts globalOptions, spec requestSpe
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		secrets := append([]string{target.token, spec.bearerToken}, spec.redactValues...)
-		redactedBody := redactSecrets(string(body), secrets...)
+		redactedBody := redactText(string(body), secrets...)
+		status := strconv.Itoa(resp.StatusCode)
+		if canonical := http.StatusText(resp.StatusCode); canonical != "" {
+			status += " " + canonical
+		}
 		if !spec.quietErrors {
-			fmt.Fprintln(a.err, resp.Status)
+			fmt.Fprintln(a.err, status)
 			_, _ = a.err.Write([]byte(redactedBody))
 		}
-		return nil, httpStatusError{status: resp.Status, body: redactedBody}
+		return nil, httpStatusError{status: status, body: redactedBody}
 	}
 	return body, nil
+}
+
+func sameCredentialOrigin(a, b *url.URL) bool {
+	port := func(u *url.URL) string {
+		if value := u.Port(); value != "" {
+			return value
+		}
+		if strings.EqualFold(u.Scheme, "https") {
+			return "443"
+		}
+		return "80"
+	}
+	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Hostname(), b.Hostname()) && port(a) == port(b)
 }
 
 func (a *App) execute(ctx context.Context, opts globalOptions, spec requestSpec) int {
@@ -1224,6 +1319,13 @@ func (a *App) runModels(ctx context.Context, opts globalOptions, args []string) 
 		fmt.Fprintln(a.err, err)
 		return 1
 	}
+	switch action {
+	case "list", "base", "base-tags", "tags", "create", "import", "sync", "delete-all", "export":
+		if err := requireArgs(pos, 0, "oictl models "+action); err != nil {
+			fmt.Fprintln(a.err, err)
+			return 1
+		}
+	}
 	q := map[string]string{"query": flags.values["query"], "view_option": flags.values["view-option"], "tag": flags.values["tag"], "order_by": flags.values["order-by"], "direction": flags.values["direction"], "page": flags.values["page"]}
 	switch action {
 	case "list":
@@ -1490,6 +1592,13 @@ func (a *App) runFiles(ctx context.Context, opts globalOptions, args []string) i
 		return 1
 	}
 	switch action {
+	case "list", "search", "count", "delete-all":
+		if err := requireArgs(pos, 0, "oictl files "+action); err != nil {
+			fmt.Fprintln(a.err, err)
+			return 1
+		}
+	}
+	switch action {
 	case "upload":
 		if err := requireArgs(pos, 1, "oictl files upload <path>"); err != nil {
 			fmt.Fprintln(a.err, err)
@@ -1560,17 +1669,32 @@ func multipartFileBody(path string, metadata string) (io.Reader, string, error) 
 		return nil, "", err
 	}
 	defer file.Close()
+	// Inspect a bounded prefix without losing it from the uploaded bytes.
+	prefix := make([]byte, 512)
+	n, err := io.ReadFull(file, prefix)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, "", err
+	}
+	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(path)))
+	if contentType == "" {
+		contentType = http.DetectContentType(prefix[:n])
+	}
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	part, err := writer.CreateFormFile("file", filepath.Base(path))
+	headers := make(textproto.MIMEHeader)
+	headers.Set("Content-Disposition", mime.FormatMediaType("form-data", map[string]string{"name": "file", "filename": filepath.Base(path)}))
+	headers.Set("Content-Type", contentType)
+	part, err := writer.CreatePart(headers)
 	if err != nil {
 		return nil, "", err
 	}
-	if _, err := io.Copy(part, file); err != nil {
+	if _, err := io.Copy(part, io.MultiReader(bytes.NewReader(prefix[:n]), file)); err != nil {
 		return nil, "", err
 	}
 	if metadata != "" {
-		_ = writer.WriteField("metadata", metadata)
+		if err := writer.WriteField("metadata", metadata); err != nil {
+			return nil, "", err
+		}
 	}
 	if err := writer.Close(); err != nil {
 		return nil, "", err

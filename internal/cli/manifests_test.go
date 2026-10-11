@@ -383,7 +383,7 @@ func TestAdditionalManifestKindsValidationAndScopes(t *testing.T) {
 		"channel":        `{"apiVersion":"oictl.openwebui/v1","kind":"Channel","metadata":{"name":"ops"},"spec":{"name":"Ops"},"access_grants":[]}`,
 		"function":       `{"apiVersion":"oictl.openwebui/v1","kind":"Function","metadata":{"name":"fn_a"},"spec":{"id":"fn_a","name":"Fn","content":"print(1)"}}`,
 		"function-valve": `{"apiVersion":"oictl.openwebui/v1","kind":"FunctionValve","metadata":{"name":"fn_a"},"spec":{"level":2}}`,
-		"group":          `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"group-a"},"spec":{"id":"group-a","name":"Group A"}}`,
+		"group":          `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"group-a"},"spec":{"id":"group-a","name":"Group A","description":"Example group"}}`,
 		"skill":          `{"apiVersion":"oictl.openwebui/v1","kind":"Skill","metadata":{"name":"skill-a"},"spec":{"id":"skill-a","name":"Skill","content":"Do work"},"access_grants":[]}`,
 		"terminal":       `{"apiVersion":"oictl.openwebui/v1","kind":"TerminalServerConnection","metadata":{"name":"shell-a"},"spec":{"url":"https://terminal"},"access_grants":[]}`,
 		"tool-valve":     `{"apiVersion":"oictl.openwebui/v1","kind":"ToolValve","metadata":{"name":"weather_tool"},"spec":{"enabled":true}}`,
@@ -590,7 +590,7 @@ func TestManifestAccessGrantSelectorsValidateAndResolve(t *testing.T) {
 			_, _ = io.WriteString(w, `{"users":[{"id":"u-email","email":"user@example.com","name":"User Email"},{"id":"u-name","email":"one@example.com","name":"User One"}],"total":2}`)
 		case "/api/v1/groups/":
 			groupRequests++
-			_, _ = io.WriteString(w, `[{"id":"g-sre","name":"SRE"},{"id":"ops","name":"Ops"}]`)
+			_, _ = io.WriteString(w, `[{"id":"g-sre","name":"SRE","description":"Example group"},{"id":"ops","name":"Ops"}]`)
 		default:
 			t.Fatalf("unexpected request %s", r.URL.String())
 		}
@@ -656,7 +656,7 @@ func TestManifestPrincipalResolutionFailuresAndRawIDSkipLookups(t *testing.T) {
 			_, _ = io.WriteString(w, `[]`)
 		case "/api/v1/groups/":
 			lookupRequests++
-			_, _ = io.WriteString(w, `[{"id":"g1","name":"SRE"},{"id":"g2","name":"SRE"}]`)
+			_, _ = io.WriteString(w, `[{"id":"g1","name":"SRE","description":"Example group"},{"id":"g2","name":"SRE","description":"Example group"}]`)
 		default:
 			t.Fatalf("unexpected request %s", r.URL.String())
 		}
@@ -739,11 +739,11 @@ func TestPlannerCreateUpdateGrantReplacementUnchangedDeleteAndJSON(t *testing.T)
 
 func TestModelManifestPlanningDiffsManagedFieldsAndPrunes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/models/list" {
+		if r.URL.Path != "/api/v1/models/all" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
 		switch r.URL.Query().Get("page") {
-		case "1":
+		case "", "1":
 			_, _ = io.WriteString(w, `{"items":[{"id":"llama-ops","base_model_id":"llama3","name":"Llama Ops","meta":{"description":"old"},"params":{"temperature":0.2},"is_active":true,"user_id":"u1","created_at":1,"updated_at":2,"write_access":true,"access_grants":[]},{"id":"same","name":"Same","meta":{},"params":{},"is_active":true,"user_id":"u2","created_at":3,"updated_at":4,"write_access":false}],"total":4}`)
 		case "2":
 			_, _ = io.WriteString(w, `{"items":[{"id":"grant-model","name":"Grant Model","meta":{},"params":{},"is_active":true,"access_grants":[{"principal_type":"group","principal_id":"ops","permission":"read"}]},{"id":"remote-only","name":"Remote Only","meta":{},"params":{},"is_active":true}],"total":4}`)
@@ -790,7 +790,7 @@ func TestModelManifestPlanningDiffsManagedFieldsAndPrunes(t *testing.T) {
 
 func TestManifestPlanningPreservesOmittedActiveState(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/models/list" {
+		if r.URL.Path != "/api/v1/models/all" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
 		_, _ = io.WriteString(w, `{"items":[{"id":"llama-ops","name":"Llama Ops","meta":{},"params":{},"is_active":true}],"total":1}`)
@@ -1195,7 +1195,7 @@ func TestManifestApplyValveOwnerResolutionUsesIDNotDisplayName(t *testing.T) {
 
 func TestManifestApplyUsesGeneratedSameSetGroupIDAndConverges(t *testing.T) {
 	dir := t.TempDir()
-	writeManifest(t, filepath.Join(dir, "z-group.json"), `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"name":"SRE"}}`)
+	writeManifest(t, filepath.Join(dir, "z-group.json"), `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"name":"SRE","description":"Example group"}}`)
 	writeManifest(t, filepath.Join(dir, "a-skill.json"), `{"apiVersion":"oictl.openwebui/v1","kind":"Skill","metadata":{"name":"skill-a"},"spec":{"id":"skill-a","name":"Skill A","content":"x"},"access_grants":[{"principal_type":"group","principal_ref":"group:sre","permission":"write"}]}`)
 
 	groupExists := false
@@ -1205,16 +1205,16 @@ func TestManifestApplyUsesGeneratedSameSetGroupIDAndConverges(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/groups/":
 			if groupExists {
-				_, _ = io.WriteString(w, `[{"id":"generated-group","name":"SRE"}]`)
+				_, _ = io.WriteString(w, `[{"id":"generated-group","name":"SRE","description":"Example group"}]`)
 			} else {
 				_, _ = io.WriteString(w, `[]`)
 			}
 		case "/api/v1/groups/create":
 			writes = append(writes, "group")
 			groupExists = true
-			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE"}`)
+			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE","description":"Example group"}`)
 		case "/api/v1/groups/id/generated-group":
-			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE"}`)
+			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE","description":"Example group"}`)
 		case "/api/v1/skills/list":
 			_ = json.NewEncoder(w).Encode([]map[string]any{{"id": "skill-a", "name": "Skill A", "content": "x", "access_grants": grants}})
 		case "/api/v1/skills/id/skill-a/access/update":
@@ -1260,7 +1260,7 @@ func TestManifestApplyUsesGeneratedSameSetGroupIDAndConverges(t *testing.T) {
 
 func TestGeneratedGroupManifestConvergesWithoutDependent(t *testing.T) {
 	manifest := filepath.Join(t.TempDir(), "group.json")
-	writeManifest(t, manifest, `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"id":"sre","name":"SRE"}}`)
+	writeManifest(t, manifest, `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"id":"sre","name":"SRE","description":"Example group"}}`)
 
 	groupExists := false
 	creates := 0
@@ -1269,7 +1269,7 @@ func TestGeneratedGroupManifestConvergesWithoutDependent(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/groups/":
 			if groupExists {
-				_, _ = io.WriteString(w, `[{"id":"generated-group","name":"SRE"}]`)
+				_, _ = io.WriteString(w, `[{"id":"generated-group","name":"SRE","description":"Example group"}]`)
 			} else {
 				_, _ = io.WriteString(w, `[]`)
 			}
@@ -1283,12 +1283,12 @@ func TestGeneratedGroupManifestConvergesWithoutDependent(t *testing.T) {
 				t.Fatalf("group create body contains declarative id: %#v", body)
 			}
 			groupExists = true
-			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE"}`)
+			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE","description":"Example group"}`)
 		case "/api/v1/groups/id/generated-group":
 			if r.Method == http.MethodPost {
 				updates++
 			}
-			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE"}`)
+			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE","description":"Example group"}`)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
@@ -1312,10 +1312,10 @@ func TestGeneratedGroupManifestConvergesWithoutDependent(t *testing.T) {
 
 func TestGroupManifestExactIDWinsNameCollision(t *testing.T) {
 	manifest := filepath.Join(t.TempDir(), "group.json")
-	writeManifest(t, manifest, `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"id":"sre","name":"SRE"}}`)
+	writeManifest(t, manifest, `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"id":"sre","name":"SRE","description":"Example group"}}`)
 	groups := []string{
-		`[{"id":"generated-group","name":"SRE"},{"id":"sre","name":"Other"}]`,
-		`[{"id":"sre","name":"Other"},{"id":"generated-group","name":"SRE"}]`,
+		`[{"id":"generated-group","name":"SRE","description":"Example group"},{"id":"sre","name":"Other","description":"Existing group"}]`,
+		`[{"id":"sre","name":"Other","description":"Existing group"},{"id":"generated-group","name":"SRE","description":"Example group"}]`,
 	}
 	for index, response := range groups {
 		t.Run(fmt.Sprint(index), func(t *testing.T) {
@@ -1337,7 +1337,7 @@ func TestGroupManifestExactIDWinsNameCollision(t *testing.T) {
 
 func TestGeneratedGroupSyncDoesNotPruneMatchedServerID(t *testing.T) {
 	manifest := filepath.Join(t.TempDir(), "group.json")
-	writeManifest(t, manifest, `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"id":"sre","name":"SRE"}}`)
+	writeManifest(t, manifest, `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"id":"sre","name":"SRE","description":"Example group"}}`)
 
 	writes := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1347,7 +1347,7 @@ func TestGeneratedGroupSyncDoesNotPruneMatchedServerID(t *testing.T) {
 		if r.URL.Path != "/api/v1/groups/" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		_, _ = io.WriteString(w, `[{"id":"generated-group","name":"SRE"}]`)
+		_, _ = io.WriteString(w, `[{"id":"generated-group","name":"SRE","description":"Example group"}]`)
 	}))
 	defer server.Close()
 
@@ -1367,7 +1367,7 @@ func TestManifestApplyComposesSameSetGroupToolAndValveDependencies(t *testing.T)
 	dir := t.TempDir()
 	writeManifest(t, filepath.Join(dir, "a-valve.json"), `{"apiVersion":"oictl.openwebui/v1","kind":"ToolValve","metadata":{"name":"tool"},"spec":{"enabled":true}}`)
 	writeManifest(t, filepath.Join(dir, "b-tool.json"), `{"apiVersion":"oictl.openwebui/v1","kind":"Tool","metadata":{"name":"tool"},"spec":{"name":"tool","content":"x"},"access_grants":[{"principal_type":"group","principal_ref":"group:sre","permission":"write"}]}`)
-	writeManifest(t, filepath.Join(dir, "c-group.json"), `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"name":"SRE"}}`)
+	writeManifest(t, filepath.Join(dir, "c-group.json"), `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"sre"},"spec":{"name":"SRE","description":"Example group"}}`)
 
 	groupExists := false
 	toolExists := false
@@ -1378,16 +1378,16 @@ func TestManifestApplyComposesSameSetGroupToolAndValveDependencies(t *testing.T)
 		switch r.URL.Path {
 		case "/api/v1/groups/":
 			if groupExists {
-				_, _ = io.WriteString(w, `[{"id":"generated-group","name":"SRE"}]`)
+				_, _ = io.WriteString(w, `[{"id":"generated-group","name":"SRE","description":"Example group"}]`)
 			} else {
 				_, _ = io.WriteString(w, `[]`)
 			}
 		case "/api/v1/groups/create":
 			writes = append(writes, "group")
 			groupExists = true
-			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE"}`)
+			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE","description":"Example group"}`)
 		case "/api/v1/groups/id/generated-group":
-			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE"}`)
+			_, _ = io.WriteString(w, `{"id":"generated-group","name":"SRE","description":"Example group"}`)
 		case "/api/v1/tools/list":
 			if toolExists {
 				_ = json.NewEncoder(w).Encode([]map[string]any{{"id": "tool", "name": "tool", "content": "x", "access_grants": grants}})
@@ -1468,7 +1468,7 @@ func TestManifestApplyRejectsMissingOrDuplicateDependenciesBeforeMutation(t *tes
 		{name: "missing valve owner", manifests: []string{
 			`{"apiVersion":"oictl.openwebui/v1","kind":"FunctionValve","metadata":{"name":"dep"},"spec":{"enabled":true}}`,
 		}},
-		{name: "duplicate valve owners", want: "ambiguous", manifests: []string{
+		{name: "duplicate valve owners", want: "duplicate manifest identity function/shared (canonical)", manifests: []string{
 			`{"apiVersion":"oictl.openwebui/v1","kind":"Function","metadata":{"name":"a"},"spec":{"id":"shared","name":"a","content":"x"}}`,
 			`{"apiVersion":"oictl.openwebui/v1","kind":"Function","metadata":{"name":"b"},"spec":{"id":"shared","name":"b","content":"x"}}`,
 			`{"apiVersion":"oictl.openwebui/v1","kind":"FunctionValve","metadata":{"name":"shared"},"spec":{"enabled":true}}`,
@@ -1477,8 +1477,8 @@ func TestManifestApplyRejectsMissingOrDuplicateDependenciesBeforeMutation(t *tes
 			`{"apiVersion":"oictl.openwebui/v1","kind":"Skill","metadata":{"name":"skill"},"spec":{"id":"skill","name":"skill","content":"x"},"access_grants":[{"principal_type":"group","principal_ref":"group:missing","permission":"read"}]}`,
 		}},
 		{name: "duplicate groups", want: "ambiguous", manifests: []string{
-			`{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"a"},"spec":{"name":"SRE"}}`,
-			`{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"b"},"spec":{"name":"SRE"}}`,
+			`{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"a"},"spec":{"name":"SRE","description":"Example group"}}`,
+			`{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"b"},"spec":{"name":"SRE","description":"Example group"}}`,
 			`{"apiVersion":"oictl.openwebui/v1","kind":"Skill","metadata":{"name":"skill"},"spec":{"id":"skill","name":"skill","content":"x"},"access_grants":[{"principal_type":"group","principal_name":"SRE","permission":"read"}]}`,
 		}},
 	}
@@ -1663,14 +1663,14 @@ func TestModelManifestApplyOpenWebUI011UpdateAndRerun(t *testing.T) {
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v1/models/list":
+		case "/api/v1/models/all":
 			if r.Method != http.MethodGet {
 				t.Fatalf("list method = %s, want GET", r.Method)
 			}
 			page := r.URL.Query().Get("page")
 			listRequests[page]++
 			switch page {
-			case "1":
+			case "", "1":
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"items": []map[string]any{{"id": "other-model", "name": "Other", "meta": map[string]any{}, "params": map[string]any{}, "is_active": true}},
 					"total": 2,
@@ -1785,7 +1785,7 @@ func TestModelManifestApplyOpenWebUI011UpdateAndRerun(t *testing.T) {
 	if len(mutationEndpoints) != 2 {
 		t.Fatalf("rerun mutation endpoints = %v, want no mutations after first apply", mutationEndpoints)
 	}
-	if listRequests["1"] != 2 || listRequests["2"] != 2 {
+	if listRequests[""] != 2 || listRequests["2"] != 2 {
 		t.Fatalf("paginated list request counts = %#v, want two requests per page", listRequests)
 	}
 }
@@ -1800,7 +1800,7 @@ func TestModelManifestApplyCreateUpdateDeleteAndGrants(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests = append(requests, r.Method+" "+r.URL.Path)
 		switch r.URL.Path {
-		case "/api/v1/models/list":
+		case "/api/v1/models/all":
 			if deleted {
 				_, _ = io.WriteString(w, `{"items":[{"id":"llama-ops","name":"Llama Ops","meta":{},"params":{},"is_active":false}],"total":1}`)
 				return
@@ -1864,7 +1864,7 @@ func TestModelManifestApplyUpdatesActiveStateWithoutToggle(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests = append(requests, r.Method+" "+r.URL.Path)
 		switch r.URL.Path {
-		case "/api/v1/models/list":
+		case "/api/v1/models/all":
 			_, _ = io.WriteString(w, `{"items":[{"id":"llama-ops","name":"Llama Ops","meta":{},"params":{},"is_active":true}],"total":1}`)
 		case "/api/v1/models/model/update":
 			var body map[string]any
@@ -1900,7 +1900,7 @@ func TestModelManifestDiffNormalizesOptionalNullMeta(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests = append(requests, r.Method+" "+r.URL.Path)
 		switch r.URL.Path {
-		case "/api/v1/models/list":
+		case "/api/v1/models/all":
 			_, _ = io.WriteString(w, `{"items":[{"id":"llama-ops","name":"Llama Ops","meta":{"description":null,"capabilities":null,"knowledge":null,"profile_image_url":null},"params":{},"is_active":true}],"total":1}`)
 		case "/api/v1/models/model":
 			if r.URL.Query().Get("id") != "llama-ops" {
@@ -1945,7 +1945,7 @@ func TestModelManifestDiffDetectsChangedDescriptionWithNullMetaDefaults(t *testi
 	writeManifest(t, manifest, `{"apiVersion":"oictl.openwebui/v1","kind":"Model","metadata":{"name":"llama-ops"},"spec":{"name":"Llama Ops","meta":{"description":"New description"},"params":{},"is_active":true}}`)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/models/list" {
+		if r.URL.Path != "/api/v1/models/all" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
 		_, _ = io.WriteString(w, `{"items":[{"id":"llama-ops","name":"Llama Ops","meta":{"description":"Old description","capabilities":null,"knowledge":null,"profile_image_url":null},"params":{},"is_active":true}],"total":1}`)
@@ -1966,7 +1966,7 @@ func TestModelManifestDiffPreservesNonNullOptionalMetaDiff(t *testing.T) {
 	writeManifest(t, manifest, `{"apiVersion":"oictl.openwebui/v1","kind":"Model","metadata":{"name":"llama-ops"},"spec":{"name":"Llama Ops","meta":{"description":"Company graph"},"params":{},"is_active":true}}`)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/models/list" {
+		if r.URL.Path != "/api/v1/models/all" {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
 		_, _ = io.WriteString(w, `{"items":[{"id":"llama-ops","name":"Llama Ops","meta":{"description":"Company graph","capabilities":{"vision":true},"knowledge":[],"profile_image_url":null},"params":{},"is_active":true}],"total":1}`)
@@ -1988,7 +1988,7 @@ func TestModelManifestServerFilteredGrant(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v1/models/list":
+		case "/api/v1/models/all":
 			_, _ = io.WriteString(w, `{"items":[],"total":0}`)
 		case "/api/v1/models/create", "/api/v1/models/model", "/api/v1/models/model/access/update":
 			_, _ = io.WriteString(w, `{"id":"llama-ops","name":"Llama Ops","meta":{},"params":{},"is_active":true,"access_grants":[]}`)
@@ -2222,7 +2222,7 @@ func TestAdditionalManifestKindsApplyUseExpectedEndpoints(t *testing.T) {
 	skill := filepath.Join(dir, "skill.json")
 	writeManifest(t, channel, `{"apiVersion":"oictl.openwebui/v1","kind":"Channel","metadata":{"name":"channel-a"},"spec":{"name":"Channel A"},"access_grants":[{"principal_type":"user","principal_id":"*","permission":"read"}]}`)
 	writeManifest(t, function, `{"apiVersion":"oictl.openwebui/v1","kind":"Function","metadata":{"name":"fn_a"},"spec":{"id":"fn_a","name":"Fn","content":"print(1)"}}`)
-	writeManifest(t, group, `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"group-a"},"spec":{"id":"group-a","name":"Group A"}}`)
+	writeManifest(t, group, `{"apiVersion":"oictl.openwebui/v1","kind":"Group","metadata":{"name":"group-a"},"spec":{"id":"group-a","name":"Group A","description":"Example group"}}`)
 	writeManifest(t, skill, `{"apiVersion":"oictl.openwebui/v1","kind":"Skill","metadata":{"name":"skill-a"},"spec":{"id":"skill-a","name":"Skill A","content":"Do work"},"access_grants":[{"principal_type":"group","principal_id":"ops","permission":"write"}]}`)
 
 	seen := map[string]bool{}
@@ -2247,9 +2247,9 @@ func TestAdditionalManifestKindsApplyUseExpectedEndpoints(t *testing.T) {
 		case "/api/v1/functions/id/fn_a":
 			_, _ = io.WriteString(w, `{"id":"fn_a","name":"Fn","content":"print(1)"}`)
 		case "/api/v1/groups/create":
-			_, _ = io.WriteString(w, `{"id":"group-a","name":"Group A"}`)
+			_, _ = io.WriteString(w, `{"id":"group-a","name":"Group A","description":"Example group"}`)
 		case "/api/v1/groups/id/group-a":
-			_, _ = io.WriteString(w, `{"id":"group-a","name":"Group A"}`)
+			_, _ = io.WriteString(w, `{"id":"group-a","name":"Group A","description":"Example group"}`)
 		case "/api/v1/skills/create":
 			_, _ = io.WriteString(w, `{"id":"skill-a","name":"Skill A","content":"Do work","access_grants":[]}`)
 		case "/api/v1/skills/id/skill-a":

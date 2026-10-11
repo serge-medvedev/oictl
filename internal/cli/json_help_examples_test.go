@@ -70,6 +70,10 @@ func TestJSONHelpPublishedExamplesRealCLI(t *testing.T) {
 		{"models import", []string{"models", "import"}, "POST", "/api/v1/models/import", `{"models":[{"id":"example-model","name":"Example Model","meta":{},"params":{}}]}`},
 		{"knowledge files batch-add", []string{"knowledge", "files", "batch-add", "knowledge-a"}, "POST", "/api/v1/knowledge/knowledge-a/files/batch/add", `[{"file_id":"file-a","directory_id":null}]`},
 		{"automations create", []string{"automations", "create"}, "POST", "/api/v1/automations/create", `{"name":"Example schedule","data":{"prompt":"Summarize the day","model_id":"example-model","rrule":"FREQ=DAILY;BYHOUR=9;BYMINUTE=0;BYSECOND=0","terminal":{"server_id":"shell-a","cwd":"/tmp"}},"is_active":false}`},
+		{"skills create", []string{"skills", "create"}, "POST", "/api/v1/skills/create", `{"id":"example-skill","name":"Example Skill","content":"# Example\nDescribe the result.","meta":{"tags":["example"]}}`},
+		{"skills update", []string{"skills", "update", "example-skill"}, "POST", "/api/v1/skills/id/example-skill/update", `{"id":"example-skill","name":"Example Skill","description":"Updated description"}`},
+		{"scim users patch", []string{"scim", "users", "patch", "example-user", "--scim-token", "example-scim-token"}, "PATCH", "/api/v1/scim/v2/Users/example-user", `{"Operations":[{"op":"replace","path":"active","value":false}]}`},
+		{"users settings update", []string{"users", "settings", "update"}, "POST", "/api/v1/users/user/settings/update", `{"ui":{"theme":"dark"}}`},
 		{"scim users create", []string{"scim", "users", "create", "--scim-token", "example-scim-token"}, "POST", "/api/v1/scim/v2/Users", `{"userName":"user@example.com","displayName":"Example User","emails":[{"value":"user@example.com","primary":true}],"active":true}`},
 	}
 	for _, tc := range cases {
@@ -102,6 +106,54 @@ func TestJSONHelpPublishedExamplesRealCLI(t *testing.T) {
 			t.Logf("published example accepted: %s %s (%d request)", tc.method, tc.path, requests)
 		})
 	}
+	t.Run("current package and patch alternatives", func(t *testing.T) {
+		for _, tc := range []struct {
+			key          string
+			idx          int
+			args         []string
+			method, path string
+		}{
+			{"skills create", 1, []string{"skills", "create"}, "POST", "/api/v1/skills/create"},
+			{"skills update", 1, []string{"skills", "update", "example-skill"}, "POST", "/api/v1/skills/id/example-skill/update"},
+			{"skills update", 2, []string{"skills", "update", "example-skill"}, "POST", "/api/v1/skills/id/example-skill/update"},
+			{"scim users patch", 1, []string{"scim", "users", "patch", "example-user", "--scim-token", "example-scim-token"}, "PATCH", "/api/v1/scim/v2/Users/example-user"},
+			{"scim users patch", 2, []string{"scim", "users", "patch", "example-user", "--scim-token", "example-scim-token"}, "PATCH", "/api/v1/scim/v2/Users/example-user"},
+			{"scim users patch", 3, []string{"scim", "users", "patch", "example-user", "--scim-token", "example-scim-token"}, "PATCH", "/api/v1/scim/v2/Users/example-user"},
+			{"users settings update", 1, []string{"users", "settings", "update"}, "POST", "/api/v1/users/user/settings/update"},
+		} {
+			payload := example(tc.key, tc.idx)
+			var doc map[string]any
+			if err := json.Unmarshal([]byte(payload), &doc); err != nil {
+				t.Fatal(err)
+			}
+			if tc.key == "skills create" {
+				files, ok := doc["files"].([]any)
+				if !ok || len(files) != 2 {
+					t.Fatalf("not a multi-file package: %s", payload)
+				}
+				if files[0].(map[string]any)["path"] != "SKILL.md" || files[1].(map[string]any)["path"] != "scripts/helper.py" {
+					t.Fatalf("unexpected package: %s", payload)
+				}
+			}
+			if tc.key == "skills update" && tc.idx == 2 && doc["expected_version_id"] == nil {
+				t.Fatal("unversioned file operation example")
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != tc.method || r.URL.Path != tc.path {
+					t.Errorf("unexpected wire %s %s", r.Method, r.URL.Path)
+				}
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Error(err)
+				}
+				assertJSONHelpEqual(t, payload, string(body))
+				io.WriteString(w, `{}`)
+			}))
+			args := append([]string{"--base-url", server.URL, "--token", "example-token"}, tc.args...)
+			run(t, append(args, "--data", payload)...)
+			server.Close()
+		}
+	})
 	t.Run("multipart metadata", func(t *testing.T) {
 		payload := example("files upload", 0)
 		file := filepath.Join(dir, "example.txt")
@@ -160,6 +212,12 @@ func TestJSONHelpPublishedExamplesRealCLI(t *testing.T) {
 					fmt.Fprintf(w, `{"items":[%s],"total":1}`, state)
 				} else {
 					io.WriteString(w, `{"items":[],"total":0}`)
+				}
+			case "GET /api/v1/models/all":
+				if created {
+					fmt.Fprintf(w, `[%s]`, state)
+				} else {
+					io.WriteString(w, `[]`)
 				}
 			case "POST /api/v1/models/create":
 				b, _ := io.ReadAll(r.Body)
