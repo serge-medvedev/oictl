@@ -1,4 +1,6 @@
-# Declarative Resource Manifests
+# Declarative resource manifests
+
+[Project overview and quick start](../README.md) · [Connection settings and profiles](configuration.md) · [Workflow examples](workflows.md)
 
 `oictl manifests` loads JSON and YAML manifests and plans resource changes before applying them to Open WebUI. Manifest files may use `.json`, `.yaml`, or `.yml` extensions.
 
@@ -162,13 +164,15 @@ Access grant principals can be authored with exactly one selector: `principal_id
 
 Reference fields are authoring-only. `oictl manifests diff`, dry-run `apply`, mutating `apply`, and `sync` resolve them to Open WebUI `principal_id` values before planning or updating grants. Resolution failures, ambiguous matches, and type mismatches fail before mutation. Manifests that use only raw `principal_id` values, including the public `*` grant, do not query users or groups.
 
-Examples:
+Example `access_grants` array:
 
 ```json
-{ "principal_type": "user", "principal_email": "analyst@example.com", "permission": "read" }
-{ "principal_type": "user", "principal_name": "Analyst One", "permission": "read" }
-{ "principal_type": "group", "principal_name": "SRE", "permission": "write" }
-{ "principal_type": "group", "principal_ref": "group:SRE", "permission": "read" }
+[
+  { "principal_type": "user", "principal_email": "analyst@example.com", "permission": "read" },
+  { "principal_type": "user", "principal_name": "Analyst One", "permission": "read" },
+  { "principal_type": "group", "principal_name": "SRE", "permission": "write" },
+  { "principal_type": "group", "principal_ref": "group:SRE", "permission": "read" }
+]
 ```
 
 ## Skill

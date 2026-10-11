@@ -1,168 +1,106 @@
 # oictl
 
-Control CLI utility for Open WebUI.
+`oictl` is a command-line client for [Open WebUI](https://github.com/open-webui/open-webui). It lets operators administer an instance, export resources, and automate configuration changes from a terminal or script.
+
+Use it to:
+
+- Inspect and manage models, knowledge bases, files, prompts, tools, functions, and skills.
+- Administer users, groups, channels, and webhooks.
+- Preview and apply declarative JSON/YAML resource manifests, including access grants.
+- Export resources and configuration, inspect analytics, and work with automations, SCIM provisioning, and provider APIs through Open WebUI.
+
+Commands connect to an existing Open WebUI instance. What you can access depends on your account permissions and the APIs available in that deployment.
 
 ## Build from source
 
-Requires Go 1.26.4 or later. From the repository root:
+Requires [Go](https://go.dev/dl/) 1.26.4 or later. Clone the repository and build:
 
 ```sh
+git clone https://github.com/serge-medvedev/oictl.git
+cd oictl
 go build -o bin/oictl ./cmd/oictl
 export PATH="$PWD/bin:$PATH"
-```
-
-The examples below use the built `oictl` binary. The `PATH` setting applies to the current shell.
-
-## Usage
-
-```sh
 oictl --help
 ```
 
-Every JSON-consuming action has offline input help, including nested actions and
-file/directory manifests. Both `--help` and `-h` work without selectors, inputs,
-connection configuration, or a server:
+The `PATH` setting makes the built binary available in the current shell.
+
+## Quick start
+
+You need your Open WebUI instance URL and an API key or JWT token. API keys are available under **Settings > Account** when enabled by your administrator and permitted for your account; see Open WebUI's [API key guide](https://docs.openwebui.com/features/authentication-access/api-keys). Administrative commands require the corresponding server permissions.
+
+Set the URL and token in your shell, replacing the example values:
 
 ```sh
-oictl users create --help
-oictl channels messages update -h
-oictl tools valves user update --help
-oictl files upload --help
-oictl manifests apply --help
+export OPEN_WEBUI_URL='https://openwebui.example.com'
+export OPEN_WEBUI_API_KEY='YOUR_API_KEY'
 ```
 
-The reference distinguishes CLI input from server defaults, replacement behavior,
-and resource-defined fields, with examples and no source-provenance footers.
-A deployment can expose different fields. Request-body sources are `--data JSON`,
-`--file PATH`, or `--data-file PATH`; either body-file option reads stdin for `-`.
-Manifest `--file -` instead names a literal file; its help covers the local envelope.
-
-Set connection details with environment variables:
+Verify your identity and list available models:
 
 ```sh
-export OPEN_WEBUI_URL=http://localhost:3000
-export OPEN_WEBUI_API_KEY=sk-your-key
+oictl auth me
+oictl models list --output table
 ```
 
-`OPEN_WEBUI_BASE_URL` is also accepted as a base URL fallback.
+Output defaults vary by command. Use `--output json` explicitly for structured results in scripts, or `--output table` for a readable view. Avoid putting real credentials in shared scripts or shell history. For repeated access or multiple instances, see [connection settings and profiles](docs/configuration.md).
 
-Make an authenticated Open WebUI API request:
+## Typical workflows
 
-```sh
-oictl api /api/models
-```
-
-Use named profiles for repeated access to one or more instances:
+Inspect resources and save exports:
 
 ```sh
-oictl profiles set local --base-url http://localhost:3000 --token sk-your-key
-oictl --profile local auth me
-```
-
-Common control commands:
-
-```sh
-oictl models list --output json
+oictl knowledge list
 oictl models export --out models.json
 oictl config export --out config.json
-oictl files upload ./document.pdf --process false
-oictl knowledge list
-oictl knowledge export <knowledge-id> --out knowledge.zip
-oictl functions list --type filter
-oictl functions get <function-id>
-oictl functions create --file function.json
-oictl functions update <function-id> --file function.json
-oictl functions delete <function-id> --yes
-oictl functions export --include-valves --out functions.json
-oictl functions load-url https://example.invalid/function.py
-oictl functions sync --file functions.json --yes
-oictl functions toggle <function-id>
-oictl functions toggle-global <function-id>
-oictl skills list --query review
-oictl skills create --file skill.json
-oictl skills create --manifest skill.md
-oictl skills export <skill-id> --format manifest --out skill.md
-oictl tasks config get
-oictl tasks config set --file tasks-config.json
-oictl tasks skills attach review-helper ops-helper
-oictl tasks skills attach --external review-helper
-oictl tools list
-oictl tools create --file tool.json
-oictl tools export <tool-id> --manifest --out tool.json
-oictl tools export --manifest --directory manifests/tools
-oictl groups list --share true
-oictl groups create --file group.json
-oictl groups update <group-id> --file group.json
-oictl groups delete <group-id> --yes
-oictl groups users add <group-id> <user-id>
-chmod 600 user-create.json
-oictl users create --file user-create.json
-oictl users get <user-id>
-oictl users update <user-id> --file user-update.json
-oictl users delete <user-id> --yes
-oictl channels list
-oictl channels create --file channel.json
-oictl channels members list <channel-id> --query alice
-oictl channels messages post <channel-id> --file message.json
-oictl channels pins set <channel-id> <message-id>
-oictl channels reactions add <channel-id> <message-id> --name thumbs-up
-oictl webhooks channels list <channel-id>
-oictl webhooks channels create <channel-id> --name ci-bot
-oictl webhooks channels url <channel-id> <webhook-id> --out webhook-url.txt
-oictl webhooks events catalog
-oictl webhooks events create --file event-webhook.json
-oictl webhooks events disable <webhook-id>
 ```
 
-Open WebUI filters are managed through `functions` records whose returned `type` is `filter`. Function source is arbitrary Python loaded by Open WebUI; only create, update, load from URL, or sync functions from trusted sources.
-
-Task model settings are managed as task configuration through `oictl tasks config`. In the Open WebUI task config payload, `TASK_MODEL` maps to config key `task.model.default` and `TASK_MODEL_EXTERNAL` maps to `task.model.external`; `oictl` does not provide a separate `task-model` or `task-models` resource. To attach existing skills to the configured task model, use `oictl tasks skills attach <skill-id-or-name>...`; add `--external` to target `TASK_MODEL_EXTERNAL` instead of `TASK_MODEL`.
-
-Webhook table output redacts channel webhook tokens, constructed incoming webhook URLs, and event destination URLs by default. JSON output preserves complete server responses for automation and may include secret-bearing values. Use `webhooks channels url --show-url` only when you intend to print the full incoming webhook URL, or `--out path` to write it without printing it to the terminal.
-
-Declarative resource workflows:
+For declarative changes, write a resource manifest using the [manifest guide](docs/manifests.md), inspect the plan, then apply it:
 
 ```sh
 oictl manifests diff --file prompt.json
-oictl manifests apply --directory manifests/
-oictl manifests apply --dry-run --file prompt.json --output json
-oictl manifests sync --scope prompts --directory manifests/ --yes
-oictl manifests sync --scope all --directory manifests/ --yes
+oictl manifests apply --file prompt.json
 ```
 
-See `docs/manifests.md` for JSON/YAML manifest examples and authoring rules covering knowledge, prompts, tools, models, skills, functions, groups, channels, terminal server connections, public grants, group grants, private access, apply, diff, and sync. Manifest `access_grants` are supported for knowledge, prompts, tools, models, skills, channels, and terminal server connections; functions and groups reject grants before mutation.
+`apply` creates or updates declared resources without deleting omitted resources. `sync` can also delete resources absent from the selected scope; inspect its plan with `--dry-run` before confirming deletions.
 
-Advanced administration and integration surfaces:
+See [workflow examples](docs/workflows.md) for resource updates, exports, channels, webhooks, and integrations.
+
+## Safety and compatibility
+
+- Open WebUI API availability and permissions vary by deployment. Some commands require newer APIs or explicitly acknowledged deployment-specific extensions; see [API behavior and compatibility](docs/api-compatibility.md).
+- JSON responses and exported files can contain credentials, personal data, or other sensitive values. Profile and export files are written with mode `0600`; protect them and keep them out of version control.
+- Tool and function source runs as Python in Open WebUI. Deploy source only from trusted authors.
+- Preview support is action-specific. Check command help before relying on `--dry-run`; unsupported actions reject it.
+
+## Documentation and help
+
+Command help works offline, without credentials or a server. Append `--help` or `-h` at any command level; action help includes flags, inputs, and JSON examples where applicable:
 
 ```sh
-oictl chats list --page 1
-oictl chats export --out chats.ndjson
-# Explicit administrative export of every user's chats:
-oictl chats export --all-users --out all-chats.json
-oictl analytics models --start-date 1700000000 --end-date 1700600000
-oictl automations create --file automation.json
-OPEN_WEBUI_SCIM_TOKEN=scim-secret oictl scim users list --start-index 1 --count 50
-oictl providers openai request --method POST /chat/completions --file request.json --stream
-oictl providers ollama tags
+oictl users --help
+oictl users create --help
+oictl manifests apply --help
 ```
 
-Native `groups` and `users` commands manage Open WebUI resources with the normal API token. User create and update JSON may contain passwords; treat inline values, files, and generated output as sensitive, and protect payload files appropriately. Native `oictl users` administration is distinct from `oictl scim users`: SCIM commands retain their provisioning protocol and require a dedicated SCIM token from `--scim-token`, `OPEN_WEBUI_SCIM_TOKEN`, or a profile `scim_token`; they do not fall back to normal Open WebUI API tokens. Provider commands route through the configured Open WebUI instance and reject external provider URLs or `Authorization` header overrides.
+- [Connection settings and profiles](docs/configuration.md): authentication, configuration precedence, input/output, and timeouts.
+- [Workflow examples](docs/workflows.md): commands grouped by task.
+- [Declarative resource manifests](docs/manifests.md): authoring, access grants, diff, apply, and sync.
+- [API behavior and compatibility](docs/api-compatibility.md): resource-specific contracts and deployment constraints.
 
-## Safety and API compatibility
+Report bugs or request features through [GitHub issues](https://github.com/serge-medvedev/oictl/issues). Include the `oictl version` output, your Open WebUI version, and a reproduction with credentials and private data removed.
 
-- Flags are validated for the selected action before requests. `--dry-run` is supported for manifest apply/sync and extension-backed bulk UI settings patches; other actions reject it instead of silently mutating. Boolean flags accept Go boolean spellings (`true`/`false`, `TRUE`/`FALSE`, `True`/`False`, `t`/`f`, `T`/`F`, `1`/`0`); invalid values fail locally.
-- Ordinary requests have a 30-second deadline, including response reads. Override it with a positive `--timeout`, such as `--timeout 2m`. Explicit provider `--stream` requests have no default overall deadline; use `--timeout` to bound the stream.
-- Profile selection is `--profile`, then `OICTL_PROFILE`, then `default`. Login persistence and logout cleanup use that same profile. A saved default profile is used automatically; environment connection values still override profile values. Profile display redacts both bearer and SCIM tokens.
-- Model import/sync accepts `{"models":[...]}` or an array shorthand that is wrapped in that envelope; omitted `params` defaults inside each model. Function sync likewise accepts `{"functions":[...]}` or an array. Missing/wrong-shaped inventories are rejected. An intentionally empty model sync requires `--yes`; all function syncs require confirmation.
-- `channels list` returns the caller's complete accessible collection. It does not support page, query, or sort flags. Channel manifests use the administration inventory, subject to server authorization.
-- `chats export` exports only the authenticated user's chats and preserves the server's NDJSON format. `--all-users` explicitly selects the administrative database export. `skills export` and `skills export <skill-id>` default to JSON **packages**, retaining root `SKILL.md` and all supporting files on stdout and with `--out`. Packages contain `id`, `name`, `description`, `meta`, `files`, and `is_active`; they do not contain ACL grants, owner, revision history, or `version_id`. `skills get` returns root content and access/version metadata, not a package backup. `skills export <skill-id> --format manifest --out skill.md` writes only root Markdown plus the bounded frontmatter fields; it cannot back up supporting files or complex metadata/grants.
-- Cross-user `users ui-settings patch` and `bulk-patch` require a deployment-specific `PATCH /api/v1/users/{id}/settings/ui` extension that the original Open WebUI API does not provide. Supply `--allow-ui-settings-extension` only for a deployment that implements it, including when previewing with `--dry-run`. Ordinary `users settings get/update` uses the original current-user API.
-- Ordinary `users settings update` shallow-patches `ui` keys: omitted keys remain, a per-key `null` removes that key, and a supplied nested object replaces that key's value rather than recursively merging. `{}`, `{"ui":{}}`, and `{"ui":null}` do not clear stored UI preferences. Server permissions may filter supplied settings. To remove `toolServers`, use `{"ui":{"toolServers":null}}` with `--allow-sensitive-ui-keys`; the acknowledgement does not bypass server permission checks.
-- Chat list/search and automation list pagination uses `--page` with a server-defined page size; `--limit`/`--skip` are rejected on those actions. Chat search requires `--query TEXT` (alias `--q`). Automation **runs list** supports `--limit`/`--skip`.
-- Analytics filters are report-specific: models/summary/tokens accept dates and group, users additionally accepts limit, daily additionally accepts granularity, model chats accepts dates/skip/limit/order/direction, and model overview accepts days. Messages accepts dates/model/user/chat/skip/limit, with selector precedence **chat > model > user**, not AND. The chat branch ignores dates/skip/limit; the user branch ignores dates; the model branch uses dates/skip/limit. No selector returns an empty list. Unsupported report options fail before HTTP.
-- SCIM user PATCH supports `add`/`replace` on `active`, `userName`, `displayName`, `emails[primary eq true].value`, `name.formatted`, and `externalId`, including nonempty pathless objects keyed by supported paths. Only `externalId` may be removed. Invalid operations, paths, or typed values return 400 protocol errors rather than being ignored; operations validate before persistence. This is a SCIM `Operations` envelope, not JSON Patch.
-- Skill create/update JSON requires `id` and `name`; `content` is optional. Creation accepts `files` or `data.files` (not both) as a package requiring UTF-8 `SKILL.md`; without a package/content it creates an empty root. Metadata-only updates preserve omitted description/meta/is_active and files. Content-only updates replace the root while retaining supporting files. Non-null `files`, `data`, or `operations` updates are mutually exclusive and require the current `expected_version_id` from `skills get` (400 if absent, 409 on mismatch); optional `commit_message` records a revision message. Markdown input carries only the supported frontmatter and root body; use JSON for packages, file operations, or complex metadata/grants.
-- File uploads send a filename/media-derived multipart MIME type, with a binary fallback for unknown content. Open WebUI uses that type for media handling such as configured audio transcription; `--metadata` is a separate JSON text field.
-- Terminal-server `access-grants get/diff/set --out path` writes the JSON result to the selected destination without also printing it on stdout.
-- Channel webhook creation requires a name. Flag-based webhook updates preserve omitted current metadata; raw JSON updates remain deliberate replacement payloads.
-- Profile and export destinations are restricted to mode `0600` before writing, including existing files. Output, persistence, and false model-deletion results cause nonzero exits on failure.
+## Development
+
+From the repository root:
+
+```sh
+go test ./...
+go vet ./...
+```
+
+Contributions should follow the [repository instructions](AGENTS.md) and use Conventional Commits.
+
+## License
+
+[MIT](LICENSE).
