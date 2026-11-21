@@ -4,17 +4,17 @@
 
 ## Connection settings
 
-`oictl` connects to an existing Open WebUI instance with a bearer API key or JWT token. API keys must be enabled and allowed for your account; Open WebUI may also restrict which endpoints a key can access. See its [API key guide](https://docs.openwebui.com/features/authentication-access/api-keys).
+`oictl` connects to Open WebUI with an API key or a session JWT. Open WebUI can restrict API key access by account and endpoint. See the [Open WebUI API key guide](https://docs.openwebui.com/features/authentication-access/api-keys).
 
-Set connection details with environment variables:
+Set the URL and API key in your shell. Then list the models your account can access:
 
 ```sh
 export OPEN_WEBUI_URL='https://openwebui.example.com'
 export OPEN_WEBUI_API_KEY='YOUR_API_KEY'
-oictl auth me
+oictl models list
 ```
 
-Replace example values with your instance URL and token. Treat tokens as secrets; avoid storing them in shared scripts or shell history.
+Replace the example values with your URL and API key. Keep API keys out of shared scripts and shell history.
 
 The base URL is resolved in this order:
 
@@ -37,7 +37,7 @@ Use profiles for repeated access to one or more instances. With the connection v
 
 ```sh
 oictl profiles set example --base-url "$OPEN_WEBUI_URL" --token "$OPEN_WEBUI_API_KEY"
-oictl --profile example auth me
+oictl --profile example models list
 oictl profiles get example
 ```
 
@@ -47,7 +47,9 @@ Profiles are stored under `oictl/profiles/<name>.json` in the operating system's
 
 ### Login and logout
 
-When your deployment supports email/password sign-in, prepare a protected `login.json` containing your credentials in this shape:
+Use `oictl auth me` with a session JWT. If you use an API key, Open WebUI can return `403` with the message `A human session is required.`
+
+If your deployment supports email and password sign-in, save your credentials in a protected `login.json` file:
 
 ```json
 {

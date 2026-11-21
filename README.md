@@ -27,19 +27,18 @@ The `PATH` setting makes the built binary available in the current shell.
 
 ## Quick start
 
-You need your Open WebUI instance URL and an API key or JWT token. API keys are available under **Settings > Account** when enabled by your administrator and permitted for your account; see Open WebUI's [API key guide](https://docs.openwebui.com/features/authentication-access/api-keys). Administrative commands require the corresponding server permissions.
+You need your Open WebUI URL and an API key or a session JWT. If your account can use API keys, find your key under **Settings > Account**. See the [Open WebUI API key guide](https://docs.openwebui.com/features/authentication-access/api-keys).
 
-Set the URL and token in your shell, replacing the example values:
+Set the URL and token in your shell:
 
 ```sh
 export OPEN_WEBUI_URL='https://openwebui.example.com'
 export OPEN_WEBUI_API_KEY='YOUR_API_KEY'
 ```
 
-Verify your identity and list available models:
+List the models your account can access:
 
 ```sh
-oictl auth me
 oictl models list --output table
 ```
 
